@@ -10,6 +10,17 @@ Features
   * Only node.js with harmony mode (>=v0.11)
   * Storage backend: PostgreSQL
   * Required bitcoind
+  * Testnet support
+
+Todo
+----
+
+  * Electrum server interface
+  * IRC for communicate with other electrum servers
+  * TCP transport
+  * HTTP transport
+  * Socket.IO transport
+  * Tests
 
 License
 -------

@@ -1,0 +1,9 @@
+{
+  "electrum": {
+    "network": "bitcoin",
+    "tcp": {
+      "host": "ecdsa.net",
+      "port": 50001
+    }
+  }
+}

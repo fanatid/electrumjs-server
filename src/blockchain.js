@@ -150,12 +150,12 @@ Blockchain.prototype.catchUp = function() {
 
   return Q.Promise(function(resolve, reject) {
     Q.spawn(function* () {
-      var receiveSIGINT = false
-      function onSIGINT() { receiveSIGINT = true }
+      var sigintReceived = false
+      function onSIGINT() { sigintReceived = true }
       process.addListener('SIGINT', onSIGINT)
 
       try {
-        while (!receiveSIGINT) {
+        while (!sigintReceived) {
           var blockCount = (yield Q.ninvoke(self.bitcoind, 'cmd', 'getblockcount'))[0]
           var blockHash = (yield Q.ninvoke(self.bitcoind, 'cmd', 'getblockhash', blockCount))[0]
           if (self.lastBlockHash === blockHash)
@@ -172,17 +172,17 @@ Blockchain.prototype.catchUp = function() {
           yield self.revertBlock(fullBlock)
         }
 
-        if (!receiveSIGINT)
+        if (!sigintReceived)
           resolve()
 
       } catch (error) {
-        if (!receiveSIGINT)
+        if (!sigintReceived)
           reject(error)
 
       }
 
       process.removeListener('SIGINT', onSIGINT)
-      if (receiveSIGINT)
+      if (sigintReceived)
         process.exit()
     })
   })
@@ -198,6 +198,10 @@ Blockchain.prototype.importBlock = function(block) {
   return Q.Promise(function(resolve, reject) {
     Q.spawn(function* () {
       try {
+        var tm = Date.now()
+        var inputs = 0
+        var outputs = 0
+
         /** add header to storage */
         var hexHeader = util.block2rawHeader(block).toString('hex')
         yield self.storage.pushHeader(block.height, hexHeader)
@@ -216,6 +220,9 @@ Blockchain.prototype.importBlock = function(block) {
         for (var txIndex = 0; txIndex < transactions.length; ++txIndex) {
           var tx = transactions[txIndex]
           var txId = tx.getId()
+
+          inputs += tx.ins.length
+          outputs += tx.outs.length
 
           /** import inputs */
           for (var inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
@@ -240,7 +247,13 @@ Blockchain.prototype.importBlock = function(block) {
         }
 
         /** done */
-        console.log('import block #' + block.height)
+        var msg = [
+          'import block #' + block.height,
+          block.tx.length + ' transactions',
+          inputs + '/' + outputs,
+          (Date.now() - tm) + 'ms'
+        ]
+        console.log(msg.join(', '))
         resolve()
 
       } catch (error) {
