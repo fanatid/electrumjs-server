@@ -1,0 +1,12 @@
+server:
+  network: bitcoin
+  storage: postgres
+
+postgres:
+  url: postgres://username:password@localhost/database
+
+bitcoind:
+  host: localhost
+  port: 8332
+  user: bitcoinrpc
+  password: 11111
