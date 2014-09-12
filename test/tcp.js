@@ -37,7 +37,7 @@ var TCPTransport = function(host, port) {
 util.inherits(TCPTransport, events.EventEmitter)
  
 TCPTransport.prototype.end = function() {
-  this.socket.end()
+  this.socket.end('quit\n')
 }
  
 TCPTransport.prototype.rawRequest = function(rawRequest) {

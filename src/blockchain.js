@@ -53,7 +53,7 @@ Blockchain.prototype.initialize = function() {
           break
 
         default:
-          throw new Error('storage ' + storage + ' not supported')
+          throw new Error('Unknow storage: ', config.get('server.storage'))
       }
       yield self.storage.initialize()
 
@@ -221,8 +221,8 @@ Blockchain.prototype.importBlock = function(block) {
           for (var inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
             var input = tx.ins[inIndex]
             var cTxId = Array.prototype.reverse.call(new Buffer(input.hash)).toString('hex')
-            var address = yield self.storage.getAddress(cTxId, input.index)
-            if (address === null)
+            var inAddress = yield self.storage.getAddress(cTxId, input.index)
+            if (inAddress === null)
               continue
 
             yield self.storage.setSpent(cTxId, input.index, txId, inIndex, currentHeight)
@@ -231,11 +231,11 @@ Blockchain.prototype.importBlock = function(block) {
           /** import outputs */
           for (var outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
             var output = tx.outs[outIndex]
-            var address = bitcoin.Address.fromOutputScript(output.script, self.network)
-            if (address === null)
+            var outAddress = bitcoin.Address.fromOutputScript(output.script, self.network)
+            if (outAddress === null)
               continue
 
-            yield self.storage.addCoin(address, txId, outIndex, output.value, currentHeight)
+            yield self.storage.addCoin(outAddress, txId, outIndex, output.value, currentHeight)
           }
         }
 

@@ -6,6 +6,8 @@ var Q = require('q')
 
 var util = require('../util')
 
+var storageVersion = 1
+
 
 var SQL_INFO_EXISTS = '\
 SELECT * \
@@ -64,7 +66,6 @@ PostgresStorage.prototype.initialize = function() {
   Q.spawn(function* () {
     try {
       var row
-      var storageVersion = 1
       var serverNetwork = config.get('server.network')
 
       /** connect to db */

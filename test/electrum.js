@@ -1,19 +1,9 @@
-var crypto = require('crypto')
-
 var expect = require('chai').expect
 var _ = require('lodash')
 
 var config = require('./config.json')
 var fixtures = require('./fixtures/electrum.json')[config.electrum.network]
 
-
-/**
- * @param {string} data
- * @return {string}
- */
-function md5(data) {
-  return crypto.createHash('md5').update(new Buffer(data)).digest().toString('hex')
-}
 
 /**
  * @param {Object} transport
@@ -25,26 +15,28 @@ function electrumTests(data) {
     transport = data.transport
   })
 
-  function runTestsFromFixtures(fixtures, method) {
-    Object.keys(fixtures).forEach(function(key) {
-      var newMethod = (_.isUndefined(method) ? '' : method + '.') + key
-      var newFixtures = fixtures[key]
-
-      if (!_.isArray(newFixtures))
-        return runTestsFromFixtures(newFixtures, newMethod)
-
-      newFixtures.forEach(function(fixture) {
-        it(newMethod, function(done) {
-          transport.request(newMethod, fixture.params, function(response) {
-            expect(md5(JSON.stringify(response))).to.equal(fixture.expect)
-            done()
-          })
+  Object.keys(fixtures).forEach(function(method) {
+    if (method !== 'server.version') return
+    fixtures[method].forEach(function(fixture) {
+      it(method, function(done) {
+        transport.request(method, fixture.params, function(response) {
+          console.log(response)
+          var exceptMethods = [
+            'blockchain.headers.subscribe',
+            'blockchain.numblocks.subscribe',
+            'server.banner',
+            'server.donation_address',
+            'server.peers.subscribe'
+          ]
+          if (exceptMethods.indexOf(method) !== -1)
+            expect(response.result).to.be.not.undefined
+          else
+            expect(response.result).to.deep.equal(fixture.expect)
+          done()
         })
       })
     })
-  }
-
-  runTestsFromFixtures(fixtures)
+  })
 }
 
 

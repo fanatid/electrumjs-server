@@ -1,9 +1,20 @@
 server:
   network: bitcoin
   storage: postgres
+  interface:
+    - electrum
 
 postgres:
   url: postgres://username:password@localhost/database
+
+electrum:
+  banner: Welcome to Electrum!
+  donation_address: 
+  transport:
+    -
+      type: tcp
+      host: localhost
+      port: 50001
 
 bitcoind:
   host: localhost

@@ -1,8 +1,8 @@
 {
   "electrum": {
-    "network": "testnet",
+    "network": "bitcoin",
     "tcp": {
-      "host": "localhost",
+      "host": "ecdsa.net",
       "port": 50001
     }
   }

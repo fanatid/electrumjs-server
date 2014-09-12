@@ -20,7 +20,7 @@ Todo
   * IRC for communicate with other electrum servers
   * <s>TCP transport</s>
   * HTTP transport
-  * Socket.IO transport
+  * Socket.IO transport ?
   * Logging (winston?)
   * Tests
 
