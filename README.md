@@ -15,15 +15,16 @@ Features
 Todo
 ----
 
+  * Blockchain mempool
   * Electrum server interface
   * IRC for communicate with other electrum servers
-  * TCP transport
+  * <s>TCP transport</s>
   * HTTP transport
   * Socket.IO transport
+  * Logging (winston?)
   * Tests
 
 License
 -------
 
-MTI
-
+MIT

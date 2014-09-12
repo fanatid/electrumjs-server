@@ -7,46 +7,55 @@ var util = require('./util')
 
 
 /**
- * @callback Blockchain~constructor
- * @param {?Error} error
+ * @class Blockchain
  */
+function Blockchain() {
+  this._isInialized = false
+}
 
 /**
- * @class Blockchain
- * @param {Blockchain~constructor} readyCallback
+ * @return {Q.Promise}
  */
-function Blockchain(readyCallback) {
+Blockchain.prototype.initialize = function() {
   var self = this
+  if (self._isInialized)
+    return Q()
 
-  self.isTestnet = config.get('server.network') === 'testnet'
-  self.network = self.isTestnet ? bitcoin.networks.testnet : bitcoin.networks.bitcoin
+  self._isInialized = true
+  self.network = bitcoin.networks[config.get('server.network')]
 
+  var deferred = Q.defer()
   Q.spawn(function* () {
     try {
       /** create bitcoind client and check network */
-      self.bitcoind = new bitcoind.Client({
+      self.bitcoindClient = new bitcoind.Client({
         host: config.get('bitcoind.host'),
         port: config.get('bitcoind.port'),
         user: config.get('bitcoind.user'),
         pass: config.get('bitcoind.password')
       })
+      self.bitcoind = Q.nbind(self.bitcoindClient.cmd, self.bitcoindClient)
 
-      var bitcoindInfo = (yield Q.ninvoke(self.bitcoind, 'cmd', 'getinfo'))[0]
-      if (bitcoindInfo.testnet !== self.isTestnet)
+      var bitcoindInfo = (yield self.bitcoind('getinfo'))[0]
+      if (config.get('server.network') === 'testnet' && !bitcoindInfo.testnet)
         throw new Error('bitcoind and ewallet-server have different networks')
 
       /** create storage */
-      var storage = config.get('server.storage')
-      if (storage === 'mongodb') {
-        self.storage = yield require('./storage/mongo').createMongoStorage()
+      switch (config.get('server.storage')) {
+        case 'mongodb':
+          var MongoStorage = require('./storage.mongo')
+          self.storage = new MongoStorage()
+          break
 
-      } else if (storage === 'postgres') {
-        self.storage = yield require('./storage/postgres').createPostgresStorage()
+        case 'postgres':
+          var PostgresStorage = require('./storage/postgres')
+          self.storage = new PostgresStorage()
+          break
 
-      } else {
-        throw new Error('storage ' + storage + ' not supported')
-
+        default:
+          throw new Error('storage ' + storage + ' not supported')
       }
+      yield self.storage.initialize()
 
       /** load headers and set last block hash */
       self.headersCache = []
@@ -61,32 +70,16 @@ function Blockchain(readyCallback) {
       yield self.catchUp()
 
       /** done */
-      readyCallback(null)
+      console.log('Blockchain ready, current height: ' + self.getBlockCount())
+      deferred.resolve()
 
     } catch (error) {
-      readyCallback(error)
+      deferred.reject(error)
 
     }
   })
-}
 
-/**
- * Create new Blockchain
- * @return {Q.Promise}
- */
-Blockchain.createBlockchain = function() {
-  return Q.Promise(function(resolve, reject) {
-    var blockchain
-
-    function readyCallback(error) {
-      if (error === null)
-        resolve(blockchain)
-      else
-        reject(error)
-    }
-
-    blockchain = new Blockchain(readyCallback)
-  })
+  return deferred.promise
 }
 
 /**
@@ -156,19 +149,19 @@ Blockchain.prototype.catchUp = function() {
 
       try {
         while (!sigintReceived) {
-          var blockCount = (yield Q.ninvoke(self.bitcoind, 'cmd', 'getblockcount'))[0]
-          var blockHash = (yield Q.ninvoke(self.bitcoind, 'cmd', 'getblockhash', blockCount))[0]
+          var blockCount = (yield self.bitcoind('getblockcount'))[0]
+          var blockHash = (yield self.bitcoind('getblockhash', blockCount))[0]
           if (self.lastBlockHash === blockHash)
             break
 
-          blockHash = (yield Q.ninvoke(self.bitcoind, 'cmd', 'getblockhash', self.getBlockCount()))[0]
-          var fullBlock = yield util.getFullBlock(self.bitcoind, blockHash)
+          blockHash = (yield self.bitcoind('getblockhash', self.getBlockCount()))[0]
+          var fullBlock = yield util.getFullBlock(self.bitcoindClient, blockHash)
           if (self.lastBlockHash === fullBlock.previousblockhash) {
             yield self.importBlock(fullBlock)
             continue
           }
 
-          fullBlock = yield util.getFullBlock(self.bitcoind, self.lastBlockHash)
+          fullBlock = yield util.getFullBlock(self.bitcoindClient, self.lastBlockHash)
           yield self.revertBlock(fullBlock)
         }
 
@@ -338,6 +331,14 @@ Blockchain.prototype.getChunk = function(index) {
     throw new RangeError('Chunk not exists')
 
   return this.chunksCache[index]
+}
+
+/**
+ * @param {string} txHash
+ * @return {Q.Promise}
+ */
+Blockchain.prototype.getRawTx = function(txHash) {
+  return this.bitcoind('getrawtransaction', txHash, 0).spread(function(rawTx) { return rawTx })
 }
 
 

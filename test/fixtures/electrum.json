@@ -2,10 +2,28 @@
   "bitcoin": {
     "blockchain": {
       "transaction": {
+        "get_merkle": [
+          {
+            "params": ["0bb3c17a926d0d56ed109b46ddac7f3efd9b2f9f1fae2144a38e9f652fa9b46b", 319866],
+            "expect": "9b18a5cea7173d275351465b28fd489a"
+          }
+        ],
         "get": [
           {
-          	"params": ["63e9b2ff0719d79632bca6047c12a6bffcef466663c5c605e2f25533d6327e82"],
-          	"expect": "18b22f8b912b309338f07d672bb6c6fe"
+            "params": ["63e9b2ff0719d79632bca6047c12a6bffcef466663c5c605e2f25533d6327e82"],
+            "expect": "18b22f8b912b309338f07d672bb6c6fe"
+          }
+        ]
+      }
+    }
+  },
+  "testnet": {
+    "blockchain": {
+      "transaction": {
+        "get": [
+          {
+            "params": ["9854bf4761024a1075ebede93d968ce1ba98d240ba282fb1f0170e555d8fdbd8"],
+            "expect": "a786da114c7a867299a41d3b13d4a761"
           }
         ]
       }

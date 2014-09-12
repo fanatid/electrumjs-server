@@ -27,15 +27,15 @@ function electrumTests(data) {
 
   function runTestsFromFixtures(fixtures, method) {
     Object.keys(fixtures).forEach(function(key) {
-      method = (_.isUndefined(method) ? '' : method + '.') + key
-      fixtures = fixtures[key]
+      var newMethod = (_.isUndefined(method) ? '' : method + '.') + key
+      var newFixtures = fixtures[key]
 
-      if (!_.isArray(fixtures))
-        return runTestsFromFixtures(fixtures, method)
+      if (!_.isArray(newFixtures))
+        return runTestsFromFixtures(newFixtures, newMethod)
 
-      fixtures.forEach(function(fixture) {
-        it(method, function(done) {
-          transport.request(method, fixture.params, function(response) {
+      newFixtures.forEach(function(fixture) {
+        it(newMethod, function(done) {
+          transport.request(newMethod, fixture.params, function(response) {
             expect(md5(JSON.stringify(response))).to.equal(fixture.expect)
             done()
           })

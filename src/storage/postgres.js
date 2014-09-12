@@ -5,7 +5,6 @@ var pg = require('pg')
 var Q = require('q')
 
 var util = require('../util')
-var storageVersion = require('./version')
 
 
 var SQL_INFO_EXISTS = '\
@@ -45,20 +44,27 @@ var SQL_HISTORY_CREATE_INDEX_ADDRESS = 'CREATE INDEX history_address_idx ON hist
 
 
 /**
- * @callback PostgresStorage~constructor
- * @param {?Error} error
+ * @class PostgresStorage
  */
+function PostgresStorage() {
+  this._isInialized = false
+}
 
 /**
- * @class PostgresStorage
- * @param {PostgresStorage~constructor} readyCallback
+ * @return {Q.Promise}
  */
-function PostgresStorage(readyCallback) {
+PostgresStorage.prototype.initialize = function() {
   var self = this
+  if (self._isInialized)
+    return Q()
 
+  self._isInialized = true
+
+  var deferred = Q.defer()
   Q.spawn(function* () {
     try {
       var row
+      var storageVersion = 1
       var serverNetwork = config.get('server.network')
 
       /** connect to db */
@@ -92,32 +98,16 @@ function PostgresStorage(readyCallback) {
         throw new Error('Server network is ' + serverNetwork + ', whereas db network is ' + network)
 
       /** done */
-      readyCallback(null)
+      console.log('Storage (PostgreSQL) created')
+      deferred.resolve()
 
     } catch (error) {
-      readyCallback(error)
+      deferred.reject(error)
 
     }
   })
-}
 
-/**
- * Create new PostgresStorage
- * @return {Q.Promise}
- */
-PostgresStorage.createPostgresStorage = function() {
-  return Q.Promise(function(resolve, reject) {
-    var postgresStorage
-
-    function readyCallback(error) {
-      if (error === null)
-        resolve(postgresStorage)
-      else
-        reject(error)
-    }
-
-    postgresStorage = new PostgresStorage(readyCallback)
-  })
+  return deferred.promise
 }
 
 /**
