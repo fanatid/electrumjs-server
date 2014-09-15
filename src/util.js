@@ -1,46 +1,5 @@
 var crypto = require('crypto')
 
-var bitcoin = require('bitcoinjs-lib')
-var _ = require('lodash')
-var Q = require('q')
-
-
-/**
- * @param {bitcoin.Client} bitcoind
- * @param {string} blockHash
- * @return {Q.Promise}
- */
-function getFullBlock(bitcoind, blockHash) {
-  return Q.ninvoke(bitcoind, 'cmd', 'getblock', blockHash).spread(function(block) {
-    if (block.height === 0) {
-      block.tx = []
-      block.previousblockhash = '0000000000000000000000000000000000000000000000000000000000000000'
-      return block
-    }
-
-    return Q.Promise(function(resolve, reject) {
-      var batch = block.tx.map(function(txId) {
-        return { method: 'getrawtransaction', params: [txId] }
-      })
-
-      var resultTx = []
-      function callback(error, rawTx) {
-        if (error) {
-          reject(error)
-          return
-        }
-
-        resultTx.push(bitcoin.Transaction.fromHex(rawTx))
-        if (resultTx.length === batch.length) {
-          block.tx = resultTx
-          resolve(block)
-        }
-      }
-
-      bitcoind.cmd(batch, callback)
-    })
-  })
-}
 
 /**
  * @param {Buffer} data
@@ -135,8 +94,7 @@ function rawHeader2block(rawHeader) {
 
 
 module.exports = {
-  getFullBlock: getFullBlock,
-
+  sha256: sha256,
   hash256: hash256,
   hashEncode: hashEncode,
   hashDecode: hashDecode,

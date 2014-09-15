@@ -22,7 +22,7 @@ module.exports = function(grunt) {
         strict: false,
         trailing: true
       },
-      files: ['src/*.js']
+      files: ['src']
     },
     mochaTest: {
       test: {

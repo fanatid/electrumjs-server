@@ -13,6 +13,62 @@ var util = require('./util')
 
 
 /**
+ * @param {bitcoin.Client} bitcoinClient
+ * @param {string} blockHash
+ * @return {Q.Promise}
+ */
+function getFullBlock(bitcoinClient, blockHash) {
+  return Q.ninvoke(bitcoinClient, 'cmd', 'getblock', blockHash).spread(function(block) {
+    if (block.height === 0) {
+      block.tx = []
+      block.previousblockhash = '0000000000000000000000000000000000000000000000000000000000000000'
+      return block
+    }
+
+    return Q.Promise(function(resolve, reject) {
+      var batch = block.tx.map(function(txId) {
+        return { method: 'getrawtransaction', params: [txId] }
+      })
+
+      var resultTx = []
+      function callback(error, rawTx) {
+        if (error) {
+          reject(error)
+          return
+        }
+
+        resultTx.push(bitcoin.Transaction.fromHex(rawTx))
+        if (resultTx.length === batch.length) {
+          block.tx = resultTx
+          resolve(block)
+        }
+      }
+
+      bitcoinClient.cmd(batch, callback)
+    })
+  })
+}
+
+/**
+ * @param {bitcoin.Client} bitcoinClient
+ * @param {string} txId
+ * @return {Q.Promise}
+ */
+function getRawTxFromMempool(bitcoinClient, txId) {
+  return Q.ninvoke(bitcoinClient, 'cmd', 'getrawtransaction', txId).spread(function(rawTx) {
+    return rawTx
+
+  }).catch(function(error) {
+    if (error.code === -5)
+      return null
+
+    throw error
+
+  })
+}
+
+
+/**
  * @event Blockchain#newHeight
  */
 
@@ -91,7 +147,7 @@ Blockchain.prototype.initialize = function() {
       process.nextTick(self.mainIteration.bind(self))
 
       /** done */
-      console.log('Blockchain ready, current height: ' + self.getBlockCount())
+      console.log('Blockchain ready, current height: ', self.getBlockCount() - 1)
       deferred.resolve()
 
     } catch (error) {
@@ -195,12 +251,12 @@ Blockchain.prototype.catchUp = function() {
             break
 
           blockHash = (yield self.bitcoind('getblockhash', self.getBlockCount()))[0]
-          var fullBlock = yield util.getFullBlock(self.bitcoindClient, blockHash)
+          var fullBlock = yield getFullBlock(self.bitcoindClient, blockHash)
           if (self.lastBlockHash === fullBlock.previousblockhash) {
             yield self.importBlock(fullBlock)
 
           } else {
-            fullBlock = yield util.getFullBlock(self.bitcoindClient, self.lastBlockHash)
+            fullBlock = yield getFullBlock(self.bitcoindClient, self.lastBlockHash)
             yield self.importBlock(fullBlock, true)
 
           }
@@ -235,107 +291,147 @@ Blockchain.prototype.importBlock = function(block, revert) {
   if (_.isUndefined(revert))
     revert = false
 
-  return Q.Promise(function(resolve, reject) {
-    Q.spawn(function* () {
-      try {
-        var stat = {
-          st: Date.now(),
-          inputs: 0,
-          outputs: 0,
-          touchedAddress: new Set()
-        }
+  var deferred = Q.defer()
+  Q.spawn(function* () {
+    try {
+      var stat = {
+        st: Date.now(),
+        inputs: 0,
+        outputs: 0,
+        touchedAddress: new Set()
+      }
+
+      if (!revert) {
+        var hexHeader = util.block2rawHeader(block).toString('hex')
+        yield self.storage.pushHeader(block.height, hexHeader)
+        self.pushHeader(hexHeader)
+
+      } else {
+        yield self.storage.popHeader()
+        self.popHeader()
+
+      }
+
+      self.updateLastBlockHash()
+
+      var address, inIndex, outIndex, input, cTxId
+      var currentHeight = self.getBlockCount() - 1
+
+      for (var txIndex = 0; txIndex < block.tx.length; ++txIndex) {
+        var tx = block.tx[txIndex]
+        var txId = tx.getId()
+
+        stat.inputs += tx.ins.length
+        stat.outputs += tx.outs.length
 
         if (!revert) {
-          var hexHeader = util.block2rawHeader(block).toString('hex')
-          yield self.storage.pushHeader(block.height, hexHeader)
-          self.pushHeader(hexHeader)
+          for (inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
+            input = tx.ins[inIndex]
+            cTxId = util.hashEncode(input.hash)
+            address = yield self.storage.getAddress(cTxId, input.index)
+            if (address === null)
+              continue
 
+            yield self.storage.setSpent(cTxId, input.index, txId, inIndex, currentHeight)
+            stat.touchedAddress.add(address)
+          }
+
+          for (outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
+            var output = tx.outs[outIndex]
+            address = bitcoin.Address.fromOutputScript(output.script, self.network)
+            if (address === null)
+              continue
+
+            yield self.storage.addCoin(address, txId, outIndex, output.value, currentHeight)
+            stat.touchedAddress.add(address)
+          }
         } else {
-          yield self.storage.popHeader()
-          self.popHeader()
+          for (outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
+            address = yield self.storage.getAddress(txId, outIndex)
+            if (address === null)
+              continue
 
-        }
+            yield self.storage.removeCoin(txId, outIndex)
+            stat.touchedAddress.add(address)
+          }
 
-        self.updateLastBlockHash()
+          for (inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
+            input = tx.ins[inIndex]
+            cTxId = util.hashEncode(input.hash)
+            address = yield self.storage.getAddress(cTxId, input.index)
+            if (address === null)
+              continue
 
-        var address
-        var currentHeight = self.getBlockCount() - 1
-
-        for (var txIndex = 0; txIndex < block.tx.length; ++txIndex) {
-          var tx = block.tx[txIndex]
-          var txId = tx.getId()
-
-          stat.inputs += tx.ins.length
-          stat.outputs += tx.outs.length
-
-          if (!revert) {
-            for (var inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
-              var input = tx.ins[inIndex]
-              var cTxId = util.hashEncode(input.hash)
-              address = yield self.storage.getAddress(cTxId, input.index)
-              if (address === null)
-                continue
-
-              yield self.storage.setSpent(cTxId, input.index, txId, inIndex, currentHeight)
-              stat.touchedAddress.add(address)
-            }
-
-            for (var outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
-              var output = tx.outs[outIndex]
-              var address = bitcoin.Address.fromOutputScript(output.script, self.network)
-              if (address === null)
-                continue
-
-              yield self.storage.addCoin(address, txId, outIndex, output.value, currentHeight)
-              stat.touchedAddress.add(address)
-            }
-          } else {
-            for (var outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
-              address = yield self.storage.getAddress(txId, outIndex)
-              if (address === null)
-                continue
-
-              yield self.storage.removeCoin(txId, outIndex)
-              stat.touchedAddress.add(address)
-            }
-
-            for (var inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
-              var input = tx.ins[inIndex]
-              var cTxId = util.hashEncode(input.hash)
-              address = yield self.storage.getAddress(cTxId, input.index)
-              if (address === null)
-                continue
-
-              yield self.storage.setUnspent(txId, input.index)
-              stat.touchedAddress.add(address)
-            }
+            yield self.storage.setUnspent(txId, input.index)
+            stat.touchedAddress.add(address)
           }
         }
-
-        /** done */
-        var msg = [
-          (revert ? 'revert' : 'import') + ' block #' + block.height,
-          block.tx.length + ' transactions',
-          stat.inputs + '/' + stat.outputs,
-          (Date.now() - stat.st) + 'ms'
-        ]
-        console.log(msg.join(', '))
-        stat.touchedAddress.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
-        resolve()
-
-      } catch (error) {
-        reject(error)
       }
-    })
+
+      /** done */
+      var msg = [
+        (revert ? 'revert' : 'import') + ' block #' + block.height,
+        block.tx.length + ' transactions',
+        stat.inputs + '/' + stat.outputs,
+        (Date.now() - stat.st) + 'ms'
+      ]
+      console.log(msg.join(', '))
+      stat.touchedAddress.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
+      deferred.resolve()
+
+    } catch (error) {
+      deferred.reject(error)
+
+    }
   })
+  return deferred.promise
 }
 
+/**
+ * @return {Q.Promise}
+ */
+Blockchain.prototype.updateMempool = function() {
+  var self = this
+
+  var deferred = Q.defer()
+  Q.spawn(function* () {
+    try {
+      /*
+      var mempoolTxIds = new Set((yield self.bitcoind('getrawmempool'))[0]).get()
+      var touchedAddress = new Set()
+
+      var newTx = {}
+      for (var idIndex = 0; idIndex < mempoolTxIds.length; ++idIndex) {
+        if (self.mempoolTxIds.contains(mempoolTxIds[idIndex]))
+          continue
+
+        var rawTx = yield getRawTxFromMempool(self.bitcoindClient, mempoolTxIds[idIndex])
+        if (rawTx === null)
+          continue
+
+        newTx[mempoolTxIds[idIndex]] = bitcoin.Transaction.fromHex(rawTx)
+      }
+      */
+
+      deferred.resolve()
+
+    } catch(error) {
+      deferred.reject(error)
+
+    }
+  })
+  return deferred.promise
+}
+
+/**
+ */
 Blockchain.prototype.mainIteration = function() {
   var self = this
 
   Q.spawn(function* () {
     try {
-
+      yield self.catchUp()
+      yield self.updateMempool()
 
     } catch (error) {
       console.error(error)
@@ -344,23 +440,6 @@ Blockchain.prototype.mainIteration = function() {
 
     setTimeout(self.mainIteration.bind(self), 10*1000)
   })
-}
-
-/**
- * @param {string} address
- * @return {Q.Promise}
- */
-Blockchain.prototype.getUnspentCoins = function(address) {
-  return this.storage.getUnspentCoins(address)
-}
-
-/**
- * @param {string} txId
- * @param {number} outIndex
- * @return {Q.Promise}
- */
-Blockchain.prototype.getAddress = function(txId, outIndex) {
-  return this.storage.getAddress(txId, outIndex)
 }
 
 /**
@@ -373,6 +452,55 @@ Blockchain.prototype.getChunk = function(index) {
     throw new RangeError('Chunk not exists')
 
   return this.chunksCache[index]
+}
+
+/**
+ * @param {string} txId
+ * @param {number} outIndex
+ * @return {Q.Promise}
+ */
+Blockchain.prototype.getAddress = function(txId, outIndex) {
+  // Todo: also get from mempool
+  return this.storage.getAddress(txId, outIndex)
+}
+
+/**
+ * @param {string} address
+ * @return {Q.Promise}
+ */
+Blockchain.prototype.getBalance = function(address) {
+  return this.storage.getBalance(address).then(function(confirmedBalance) {
+    // Todo: add unconfirmed from mempool
+    return { confirmed: confirmedBalance, unconfirmed: 0 }
+  })
+}
+
+/**
+ * @param {string} address
+ * @return {Q.Promise}
+ */
+Blockchain.prototype.getCoins = function(address) {
+  return this.storage.getCoins(address).then(function(coins) {
+    // Todo: add unconfirmed from mempool
+    return coins
+  })
+}
+
+/**
+ * @param {string} address
+ * @return {Q.Promise}
+ */
+Blockchain.prototype.getUnspentCoins = function(address) {
+  // Todo: also get from mempool
+  return this.storage.getUnspentCoins(address)
+}
+
+/**
+ * @param {string} txHash
+ * @return {Q.Promise}
+ */
+Blockchain.prototype.getRawTx = function(txHash) {
+  return this.bitcoind('getrawtransaction', txHash, 0).spread(function(rawTx) { return rawTx })
 }
 
 /**
@@ -389,7 +517,7 @@ Blockchain.prototype.sendRawTx = function(rawTx) {
  * @return {Q.Promise}
  */
 Blockchain.prototype.getMerkle = function(txHash, height) {
-  // Todo: move to subprocess?
+  // Todo: move to subprocess
   var self = this
 
   var deferred = Q.defer()
@@ -421,7 +549,7 @@ Blockchain.prototype.getMerkle = function(txHash, height) {
         merkle = newMerkle
       }
 
-      deferred.resolve({ block_height: height, merkle: result, pos: block.tx.indexOf(txHash) })
+      deferred.resolve({ tree: result, pos: block.tx.indexOf(txHash) })
 
     } catch (error) {
       deferred.reject(error)
@@ -429,14 +557,6 @@ Blockchain.prototype.getMerkle = function(txHash, height) {
     }
   })
   return deferred.promise
-}
-
-/**
- * @param {string} txHash
- * @return {Q.Promise}
- */
-Blockchain.prototype.getRawTx = function(txHash) {
-  return this.bitcoind('getrawtransaction', txHash, 0).spread(function(rawTx) { return rawTx })
 }
 
 /**

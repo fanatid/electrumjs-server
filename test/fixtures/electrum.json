@@ -16,12 +16,20 @@
       {
         "params": ["1ND5TQ2AnQatxqmHrdMT8utb3aWgLKsc9w"],
         "expect": [ { "tx_hash": "27f1d66f8a1ee5280f4e92508dcb647e954d53004905d08a75574daee4988360", "height": 50000 }, { "tx_hash": "2d22e9ef36692d9f9a383523442fe6cd0439b9e8c0498f6b972845517d6d3045", "height": 54778 } ]
+      },
+      {
+        "params": ["1DiJ41cfjfCjfWp59wSgvGEfCmk2oT47xr"],
+        "expect": []
       }
     ],
     "blockchain.address.get_balance": [
       {
         "params": ["1FuXfSvK4UHFvjoTJjUxgnj9x2T3DujzjM"],
         "expect": { "confirmed": 5000000000, "unconfirmed": 0 }
+      },
+      {
+        "params": ["15DKvbsBgBHCCwx1bc9gCcLw8UVoj8dyWZ"],
+        "expect": { "confirmed": 0, "unconfirmed": 0 }
       }
     ],
     "blockchain.address.listunspent": [
@@ -95,6 +103,38 @@
     ]
   },
   "testnet": {
+    "blockchain.numblocks.subscribe": [
+      { "params": [] }
+    ],
+    "blockchain.headers.subscribe": [
+      { "params": [] }
+    ],
+    "blockchain.address.subscribe": [
+      {
+        "params": ["miASVwyhoeFqoLodXUdbDC5YjrdJPwxyXE"],
+        "expect": "de207ebd457a4fcb7a202bbbf532d824ccc23fcbd4d0b3557ce73c0bf9307fb4"
+      }
+    ],
+    "blockchain.address.get_history": [
+      {
+        "params": ["miASVwyhoeFqoLodXUdbDC5YjrdJPwxyXE"],
+        "expect": [ { "tx_hash": "1bd6a31671e9cc767d75980d4dbffc5cd5029f17d44dd32dcf949267e3f04631", "height": 12740 }, { "tx_hash": "9ea76cd53be261b320d8479d432aad98c61aa5945416d85ab15bed62030ce6e4", "height": 16349 } ]
+      },
+      {
+        "params": ["mnNMMA52kEPFooSkAhMvShyMpRHuoJ9mBm"],
+        "expect": []
+      }
+    ],
+    "blockchain.address.get_balance": [
+      {
+        "params": ["mn675cxzUzM8hyd7TYApCvGBhQ8v69kgGb"],
+        "expect": { "confirmed": 10050200000, "unconfirmed": 0 }
+      },
+      {
+        "params": ["mnNMMA52kEPFooSkAhMvShyMpRHuoJ9mBm"],
+        "expect": { "confirmed": 0, "unconfirmed": 0 }
+      }
+    ],
     "blockchain.address.listunspent": [
       {
         "params": ["mkUoiWTDLAoaWoyKRjXP2Vz3MLWPBr6j2B"],

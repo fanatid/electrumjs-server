@@ -23,6 +23,12 @@ function Electrum(blockchain) {
 
   this.blockchain = blockchain
   this._isInialized = false
+  this.subscribers = {
+    numblocks: {},
+    headers: {},
+    address: {},
+    clientAddresses: {}
+  }
 }
 
 inherits(Electrum, Interface)
@@ -36,6 +42,34 @@ Electrum.prototype.initialize = function() {
     return Q()
 
   self._isInialized = true
+
+  self.blockchain.on('newHeight', function() {
+    var newHeight = self.blockchain.getBlockCount() - 1
+    var numblocksObj = { id: null, method: 'blockchain.numblocks.subscribe', params: [newHeight] }
+    Object.keys(self.subscribers.numblocks).forEach(function(clientId) {
+      self.subscribers.numblocks[clientId].send(numblocksObj)
+    })
+
+    var newHeader = self.getHeader(newHeight)
+    var headersObj = { id: null, method: 'blockchain.headers.subscribe', params: [newHeader] }
+    Object.keys(self.subscribers.headers).forEach(function(clientId) {
+      self.subscribers.headers[clientId].send(headersObj)
+    })
+  })
+
+  self.blockchain.on('touchedAddress', function(address) {
+    self.getAddressStatus(address).then(function(status) {
+      var addressObj = { id: null, method: 'blockchain.address.subscribe', params: [address, status] }
+      var clients = self.subscribers.address[address]
+      Object.keys(clients).forEach(function(clientId) {
+        clients[clientId].send(addressObj)
+      })
+
+    }).catch(function(error) {
+      console.error(error)
+
+    })
+  })
 
   var promises = config.get('electrum.transport').map(function(transport) {
     switch (transport.type) {
@@ -54,7 +88,18 @@ Electrum.prototype.initialize = function() {
  * @param {Client} client
  */
 Electrum.prototype.newClient = function(client) {
-  client.on('request', function(request) { this.newRequest(client, request)}.bind(this))
+  var self = this
+
+  client.on('request', function(request) { self.newRequest(client, request)})
+  client.once('end', function() {
+    var clientId = client.getId()
+
+    delete self.subscribers.numblocks[clientId]
+    delete self.subscribers.headers[clientId]
+    var clientAddresses = self.subscribers.clientAddresses[clientId] || []
+    clientAddresses.forEach(function(addr) { delete self.subscribers.address[addr][clientId] })
+    delete self.subscribers.clientAddresses[clientId]
+  })
 }
 
 /**
@@ -80,28 +125,52 @@ Electrum.prototype.newRequest = function(client, request) {
 
       switch (method) {
         case 'blockchain.numblocks.subscribe':
-          throw new Error('Not implemented yet')
+          result = self.blockchain.getBlockCount() - 1
+          self.subscribers.numblocks[client.getId()] = client
+          break
 
         case 'blockchain.headers.subscribe':
-          throw new Error('Not implemented yet')
+          var height = self.blockchain.getBlockCount() - 1
+          result = self.blockchain.getHeader(height)
+          self.subscribers.headers[client.getId()] = client
+          break
 
         case 'blockchain.address.subscribe':
-          throw new Error('Not implemented yet')
+          result = yield self.getAddressStatus(params[0])
+
+          var subscription = self.subscribers.address[params[0]]
+          if (_.isUndefined(subscription))
+            subscription = {}
+          subscription[client.getId()] = client
+          self.subscribers.address[params[0]] = subscription
+
+          var addresses = self.subscribers.clientAddresses[client.getId()]
+          if (_.isUndefined(addresses))
+            addresses = []
+          addresses.push(params[0])
+          self.subscribers.clientAddresses[client.getId()] = addresses
+
+          break
 
         case 'blockchain.address.get_history':
-          throw new Error('Not implemented yet')
+          result = yield self.getHistory(params[0])
+          break
 
         case 'blockchain.address.get_mempool':
           throw new Error('Not implemented yet')
 
         case 'blockchain.address.get_balance':
-          throw new Error('Not implemented yet')
+          result = yield self.blockchain.getBalance(params[0])
+          break
 
         case 'blockchain.address.get_proof':
           throw new Error('Not implemented yet')
 
         case 'blockchain.address.listunspent':
-          result = yield self.blockchain.getUnspentCoins(params[0])
+          var unspentCoins = yield self.blockchain.getUnspentCoins(params[0])
+          result = unspentCoins.map(function(coin) {
+            return { tx_hash: coin.txId, tx_pos: coin.outIndex, value: coin.value, height: coin.height }
+          })
           break
 
         case 'blockchain.utxo.get_address':
@@ -133,7 +202,13 @@ Electrum.prototype.newRequest = function(client, request) {
           break
 
         case 'blockchain.transaction.get_merkle':
-          result = yield self.blockchain.getMerkle(params[0], parseInt(params[1]))
+          var height = parseInt(params[1])
+          var merkle = yield self.blockchain.getMerkle(params[0], height)
+          result = {
+            block_height: height,
+            merkle: merkle.tree,
+            pos: merkle.pos
+          }
           break
 
         case 'blockchain.transaction.get':
@@ -166,9 +241,38 @@ Electrum.prototype.newRequest = function(client, request) {
       client.send({ id: requestId, result: result })
 
     } catch (error) {
+      console.error(error)
       client.send({ id: requestId, error: error.message })
 
     }
+  })
+}
+
+/**
+ * @param {string} address
+ * @return {Q.Promise}
+ */
+Electrum.prototype.getHistory = function(address) {
+  return this.blockchain.getCoins(address).then(function(coins) {
+    var history = []
+    coins.forEach(function(coin) {
+      history.push([coin.cTxId, coin.cHeight])
+      if (coin.sTxId !== null)
+        history.push([coin.sTxId, coin.sHeight])
+    })
+    history = _.sortBy(_.uniq(history), function(entry) { return entry[1] === 0 ? Infinity : entry[1] })
+    return history.map(function(entry) { return { tx_hash: entry[0], height: entry[1] } })
+  })
+}
+
+/**
+ * @param {string} address
+ * @return {Q.Promise}
+ */
+Electrum.prototype.getAddressStatus = function(address) {
+  return this.getHistory(address).then(function(history) {
+    var status = history.map(function(entry) { return entry.tx_hash + ':' + entry.height + ':' }).join('')
+    return util.sha256(status).toString('hex')
   })
 }
 

@@ -63,13 +63,10 @@ TCPClient.prototype.handleRawRequest = function(rawRequest) {
     return
 
   try {
-    var request = JSON.parse(rawRequest)
+    this.emit('request', JSON.parse(rawRequest))
   } catch (error) {
     this.send({ error: 'bad JSON' })
-    return
   }
-
-  this.emit('request', request)
 }
 
 
