@@ -6,7 +6,7 @@ var Q = require('q')
 
 var util = require('../util')
 
-var storageVersion = 1
+var storageVersion = 2
 
 
 var SQL_INFO_EXISTS = '\
@@ -43,6 +43,7 @@ CREATE TABLE history ( \
 )'
 
 var SQL_HISTORY_CREATE_INDEX_ADDRESS = 'CREATE INDEX history_address_idx ON history (address)'
+var SQL_HISTORY_CREATE_INDEX_UNSPENT = 'CREATE INDEX history_unspent_idx ON history (address, sheight)'
 
 
 /**
@@ -83,6 +84,7 @@ PostgresStorage.prototype.initialize = function() {
 
         yield self.query(SQL_HISTORY_CREATE_TABLE)
         yield self.query(SQL_HISTORY_CREATE_INDEX_ADDRESS)
+        yield self.query(SQL_HISTORY_CREATE_INDEX_UNSPENT)
 
       }
 
@@ -117,37 +119,29 @@ PostgresStorage.prototype.initialize = function() {
  * @return {Q.Promise}
  */
 PostgresStorage.prototype.pushHeader = function(height, header) {
-  return this.query('INSERT INTO headers (height, header) VALUES ($1, $2)', [height, header])
+  var query = 'INSERT INTO headers (height, header) VALUES ($1, $2)'
+  var params = [height, header]
+
+  return this.query(query, params)
 }
 
 /**
  * @return {Q.Promise}
  */
 PostgresStorage.prototype.popHeader = function() {
-  return this.query('DELETE FROM headers WHERE height IN (SELECT height FROM headers ORDER BY height DESC LIMIT 1)')
+  var query = 'DELETE FROM headers WHERE height IN (SELECT height FROM headers ORDER BY height DESC LIMIT 1)'
+
+  return this.query(query)
 }
 
 /**
  * @return {Q.Promise}
  */
 PostgresStorage.prototype.getAllHeaders = function() {
-  return this.query('SELECT header FROM headers ORDER BY height').then(function(result) {
+  var query = 'SELECT header FROM headers ORDER BY height'
+
+  return this.query(query).then(function(result) {
     return _.pluck(result.rows, 'header')
-  })
-}
-
-/**
- * @param {string} cTxId
- * @param {number} cIndex
- * @return {Q.Promise}
- */
-PostgresStorage.prototype.getAddress = function(cTxId, cIndex) {
-  var values = [new Buffer(cTxId, 'hex'), cIndex]
-  return this.query('SELECT address FROM history WHERE cTxId = $1 AND cIndex = $2', values).then(function(result) {
-    if (result.rowCount === 0)
-      return null
-
-    return base58check.encode(result.rows[0].address)
   })
 }
 
@@ -160,9 +154,10 @@ PostgresStorage.prototype.getAddress = function(cTxId, cIndex) {
  * @return {Q.Promise}
  */
 PostgresStorage.prototype.addCoin = function(address, cTxId, cIndex, cValue, cHeight) {
-  var values = [base58check.decode(address), new Buffer(cTxId, 'hex'), cIndex, cValue, cHeight]
-  return this.query(
-    'INSERT INTO history (address, cTxId, cIndex, cValue, cHeight) VALUES ($1, $2, $3, $4, $5)', values)
+  var query = 'INSERT INTO history (address, cTxId, cIndex, cValue, cHeight) VALUES ($1, $2, $3, $4, $5)'
+  var params = [base58check.decode(address), new Buffer(cTxId, 'hex'), cIndex, cValue, cHeight]
+
+  return this.query(query, params)
 }
 
 /**
@@ -171,8 +166,10 @@ PostgresStorage.prototype.addCoin = function(address, cTxId, cIndex, cValue, cHe
  * @return {Q.Promise}
  */
 PostgresStorage.prototype.removeCoin = function(cTxId, cIndex) {
-  var values = [new Buffer(cTxId, 'hex'), cIndex]
-  return this.query('DELETE FROM history WHERE cTxId=$1 AND cIndex=$2', values)
+  var query = 'DELETE FROM history WHERE cTxId=$1 AND cIndex=$2'
+  var params = [new Buffer(cTxId, 'hex'), cIndex]
+
+  return this.query(query, params)
 }
 
 /**
@@ -184,8 +181,10 @@ PostgresStorage.prototype.removeCoin = function(cTxId, cIndex) {
  * @return {Q.Promise}
  */
 PostgresStorage.prototype.setSpent = function(cTxId, cIndex, sTxId, sIndex, sHeight) {
-  var values = [new Buffer(cTxId, 'hex'), cIndex, new Buffer(sTxId, 'hex'), sIndex, sHeight]
-  return this.query('UPDATE history SET sTxId=$3, sIndex=$4, sHeight=$5 WHERE cTxId=$1 AND cIndex=$2', values)
+  var query = 'UPDATE history SET sTxId=$3, sIndex=$4, sHeight=$5 WHERE cTxId=$1 AND cIndex=$2'
+  var params = [new Buffer(cTxId, 'hex'), cIndex, new Buffer(sTxId, 'hex'), sIndex, sHeight]
+
+  return this.query(query, params)
 }
 
 /**
@@ -193,8 +192,48 @@ PostgresStorage.prototype.setSpent = function(cTxId, cIndex, sTxId, sIndex, sHei
  * @param {number} sIndex
  */
 PostgresStorage.prototype.setUnspent = function(sTxId, sIndex) {
-  var values = [new Buffer(cTxId, 'hex'), cIndex, null, null, null]
-  return this.query('UPDATE history SET sTxId=$3, sIndex=$4, sHeight=$5 WHERE cTxId=$1 AND cIndex=$2', values)
+  var query = 'UPDATE history SET sTxId=$3, sIndex=$4, sHeight=$5 WHERE cTxId=$1 AND cIndex=$2'
+  var params = [new Buffer(cTxId, 'hex'), cIndex, null, null, null]
+
+  return this.query(query, params)
+}
+
+/**
+ * @param {string} cTxId
+ * @param {number} cIndex
+ * @return {Q.Promise}
+ */
+PostgresStorage.prototype.getAddress = function(cTxId, cIndex) {
+  var query = 'SELECT address FROM history WHERE cTxId = $1 AND cIndex = $2'
+  var params = [new Buffer(cTxId, 'hex'), cIndex]
+
+  return this.query(query, params).then(function(result) {
+    if (result.rowCount === 0)
+      return null
+
+    return base58check.encode(result.rows[0].address)
+  })
+}
+
+/**
+ * @param {string} address
+ * @return {Q.Promise}
+ */
+PostgresStorage.prototype.getUnspentCoins = function(address) {
+  var sql = 'SELECT cTxId, cIndex, cValue, cHeight FROM history WHERE address = $1 and sheight is NULL'
+  var params = [base58check.decode(address)]
+
+  return this.query(sql, params).then(function(result) {
+    result = result.rows.map(function(row) {
+      return {
+        tx_hash: row.ctxid.toString('hex'),
+        tx_pos: parseInt(row.cindex),
+        value: parseInt(row.cvalue),
+        height: row.cheight
+      }
+    })
+    return result
+  })
 }
 
 

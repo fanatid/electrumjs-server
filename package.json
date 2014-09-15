@@ -18,11 +18,13 @@
     "bitcoin": "2.2.0",
     "bitcoinjs-lib": "1.0.2",
     "bs58check": "1.0.1",
+    "buffer-equal": "0.0.1",
     "config": "1.1.0",
     "js-yaml": "3.2.2",
     "lodash": "2.4.1",
     "pg": "3.4.2",
-    "q": "1.0.1"
+    "q": "1.0.1",
+    "set": "^1.1.1"
   },
   "devDependencies": {
     "chai": "1.9.1",

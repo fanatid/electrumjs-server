@@ -16,11 +16,11 @@ function electrumTests(data) {
   })
 
   Object.keys(fixtures).forEach(function(method) {
-    if (method !== 'server.version') return
+//if (method !== 'blockchain.address.listunspent') return
     fixtures[method].forEach(function(fixture) {
       it(method, function(done) {
         transport.request(method, fixture.params, function(response) {
-          console.log(response)
+//console.log(response)
           var exceptMethods = [
             'blockchain.headers.subscribe',
             'blockchain.numblocks.subscribe',

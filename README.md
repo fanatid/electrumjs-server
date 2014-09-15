@@ -15,7 +15,6 @@ Features
 Todo
 ----
 
-  * Blockchain mempool
   * Electrum server interface
   * IRC for communicate with other electrum servers
   * <s>TCP transport</s>

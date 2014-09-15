@@ -1,5 +1,6 @@
 var crypto = require('crypto')
 
+var bitcoin = require('bitcoinjs-lib')
 var _ = require('lodash')
 var Q = require('q')
 
@@ -23,13 +24,13 @@ function getFullBlock(bitcoind, blockHash) {
       })
 
       var resultTx = []
-      function callback(error, tx) {
+      function callback(error, rawTx) {
         if (error) {
           reject(error)
           return
         }
 
-        resultTx.push(tx)
+        resultTx.push(bitcoin.Transaction.fromHex(rawTx))
         if (resultTx.length === batch.length) {
           block.tx = resultTx
           resolve(block)
@@ -39,74 +40,6 @@ function getFullBlock(bitcoind, blockHash) {
       bitcoind.cmd(batch, callback)
     })
   })
-}
-
-/**
- * @param {bitcoinjs-lib.Transaction[]}
- * @return {bitcoinjs-lib.Transaction[]}
- */
-function toposort(transactions) {
-  var transactionsIds = _.zipObject(transactions.map(function(tx) { return [tx.getId(), tx] }))
-  var result = []
-  var resultIds = {}
-
-  function sort(tx, topTx) {
-    if (!_.isUndefined(resultIds[tx.getId()]))
-      return
-
-    tx.ins.forEach(function(input) {
-      var inputId = Array.prototype.reverse.call(new Buffer(input.hash)).toString('hex')
-      if (_.isUndefined(transactionsIds[inputId]))
-        return
-
-      if (transactionsIds[inputId].getId() === topTx.getId())
-        throw new Error('graph is cyclical')
-
-      sort(transactionsIds[inputId], tx)
-    })
-
-    result.push(tx)
-    resultIds[tx.getId()] = true
-  }
-
-  transactions.forEach(function(tx) { sort(tx, tx) })
-
-  return result
-}
-
-/**
- * Revert bytes order
- *
- * @param {string} s
- * @return {string}
- */
-function revHex(s) {
-  return Array.prototype.reverse.call(new Buffer(s, 'hex')).toString('hex')
-}
-
-/**
- * Convert bitcoin block to raw header (80bytes Buffer)
- *
- * @param {Object} block
- * @param {number} block.version
- * @param {string} block.previousblockhash
- * @param {string} block.merkleroot
- * @param {number} block.time
- * @param {string} block.bits
- * @param {number} block.nonce
- * @return {Buffer}
- */
-function block2rawHeader(block) {
-  var result = new Buffer(80)
-
-  result.writeUInt32LE(block.version, 0)
-  result.write(revHex(block.previousblockhash), 4, 32, 'hex')
-  result.write(revHex(block.merkleroot), 36, 32, 'hex')
-  result.writeUInt32LE(block.time, 68)
-  result.write(revHex(block.bits), 72, 4, 'hex')
-  result.writeUInt32LE(block.nonce, 76)
-
-  return result
 }
 
 /**
@@ -127,11 +60,87 @@ function hash256(data) {
   return sha256(sha256(data))
 }
 
+/**
+ * @param {Buffer} s
+ * @return {string}
+ */
+function hashEncode(s) {
+  return Array.prototype.reverse.call(new Buffer(s)).toString('hex')
+}
+
+/**
+ * @param {string} s
+ * @return {Buffer}
+ */
+function hashDecode(s) {
+  return Array.prototype.reverse.call(new Buffer(s, 'hex'))
+}
+
+/**
+ * Revert bytes order
+ *
+ * @param {string} s
+ * @return {string}
+ */
+function revHex(s) {
+  return hashDecode(s).toString('hex')
+}
+
+/**
+ * @typedef {Object} BitcoinBlock
+ * @param {number} block.version
+ * @param {string} block.previousblockhash
+ * @param {string} block.merkleroot
+ * @param {number} block.time
+ * @param {string} block.bits
+ * @param {number} block.nonce
+ */
+
+/**
+ * Convert bitcoin block to raw header (80bytes Buffer)
+ * @param {BitcoinBlock} block
+ * @return {Buffer}
+ */
+function block2rawHeader(block) {
+  var result = new Buffer(80)
+
+  result.writeUInt32LE(block.version, 0)
+  result.write(revHex(block.previousblockhash), 4, 32, 'hex')
+  result.write(revHex(block.merkleroot), 36, 32, 'hex')
+  result.writeUInt32LE(block.time, 68)
+  result.write(revHex(block.bits), 72, 4, 'hex')
+  result.writeUInt32LE(block.nonce, 76)
+
+  return result
+}
+
+/**
+ * Convert raw header to bitcoin block
+ *
+ * @param {Buffer} rawHeader
+ * @return {BitcoinBlock}
+ */
+function rawHeader2block(rawHeader) {
+  var block = {
+    version: rawHeader.readUInt32LE(0),
+    previousblockhash: revHex(rawHeader.slice(4, 36).toString('hex')),
+    merkleroot: revHex(rawHeader.slice(36, 68).toString('hex')),
+    time: rawHeader.readUInt32LE(68),
+    bits: revHex(rawHeader.slice(72, 76).toString('hex')),
+    nonce: rawHeader.readUInt32LE(76)
+  }
+
+  return block
+}
+
 
 module.exports = {
   getFullBlock: getFullBlock,
-  toposort: toposort,
+
+  hash256: hash256,
+  hashEncode: hashEncode,
+  hashDecode: hashDecode,
 
   block2rawHeader: block2rawHeader,
-  hash256: hash256
+  rawHeader2block: rawHeader2block
 }
