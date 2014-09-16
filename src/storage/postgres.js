@@ -1,9 +1,11 @@
 var base58check = require('bs58check')
 var config = require('config')
+var inherits = require('util').inherits
 var _ = require('lodash')
 var pg = require('pg')
 var Q = require('q')
 
+var Storage = require('./storage')
 var storageVersion = 2
 
 
@@ -56,8 +58,12 @@ var SQL_HISTORY_CREATE_INDEX_UNSPENT = 'CREATE INDEX history_unspent_idx ON hist
  * @class PostgresStorage
  */
 function PostgresStorage() {
+  Storage.call(this)
+
   this._isInialized = false
 }
+
+inherits(PostgresStorage, Storage)
 
 /**
  * @return {Q.Promise}
@@ -120,11 +126,11 @@ PostgresStorage.prototype.initialize = function() {
 }
 
 /**
- * @param {number} height
  * @param {string} header
+ * @param {number} height
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.pushHeader = function(height, header) {
+PostgresStorage.prototype.pushHeader = function(header, height) {
   var sql = 'INSERT INTO headers (height, header) VALUES ($1, $2)'
   var params = [height, header]
 
@@ -244,12 +250,10 @@ PostgresStorage.prototype.getCoins = function(address) {
 
   return this.query(sql, params).then(function(result) {
     function row2history(row) {
-      return {
-        cTxId: row.ctxid.toString('hex'),
-        cHeight: row.cheight,
-        sTxId: row.stxid.toString('hex'),
-        sHeight: row.sheight
-      }
+      var obj = { cTxId: row.ctxid.toString('hex'), cHeight: row.cheight }
+      if (row.stxid !== null)
+        obj = _.extend(obj, { sTxId: row.stxid.toString('hex'), sHeight: row.sheight })
+      return obj
     }
 
     return result.rows.map(row2history)

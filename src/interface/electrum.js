@@ -21,8 +21,9 @@ var serverDonationAddress = config.get('electrum.donation_address') || ''
 function Electrum(blockchain) {
   Interface.call(this)
 
-  this.blockchain = blockchain
   this._isInialized = false
+
+  this.blockchain = blockchain
   this.subscribers = {
     numblocks: {},
     headers: {},
@@ -50,7 +51,7 @@ Electrum.prototype.initialize = function() {
       self.subscribers.numblocks[clientId].send(numblocksObj)
     })
 
-    var newHeader = self.getHeader(newHeight)
+    var newHeader = self.blockchain.getHeader(newHeight)
     var headersObj = { id: null, method: 'blockchain.headers.subscribe', params: [newHeader] }
     Object.keys(self.subscribers.headers).forEach(function(clientId) {
       self.subscribers.headers[clientId].send(headersObj)
@@ -60,7 +61,7 @@ Electrum.prototype.initialize = function() {
   self.blockchain.on('touchedAddress', function(address) {
     self.getAddressStatus(address).then(function(status) {
       var addressObj = { id: null, method: 'blockchain.address.subscribe', params: [address, status] }
-      var clients = self.subscribers.address[address]
+      var clients = self.subscribers.address[address] || []
       Object.keys(clients).forEach(function(clientId) {
         clients[clientId].send(addressObj)
       })

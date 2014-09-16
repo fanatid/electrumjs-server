@@ -24,17 +24,17 @@ function Client() {
 util.inherits(Client, events.EventEmitter)
 
 /**
+ * @return {string}
+ */
+Client.prototype.getId = function() {
+  return this.clientId
+}
+
+/**
  * @abstract
  * @param {Object} response
  */
 Client.prototype.send = function() { throw new Error('Not implemented yet') }
-
-/**
- * @return {string}
- */
-Client.prototype.getId = function() {
-	return this.clientId
-}
 
 
 module.exports = Client

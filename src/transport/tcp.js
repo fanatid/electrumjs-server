@@ -4,6 +4,7 @@ var inherits = require('util').inherits
 var Q = require('q')
 
 var Client = require('./client')
+var Transport = require('./transport')
 
 
 /**
@@ -77,11 +78,16 @@ TCPClient.prototype.handleRawRequest = function(rawRequest) {
  * @param {string} [host]
  */
 function TCPTransport(interface, port, host) {
+  Transport.call(this)
+
+  this._isInialized = false
+
   this.interface = interface
   this.port = port
   this.host = host
-  this._isInialized = false
 }
+
+inherits(TCPTransport, Transport)
 
 /**
  * @return {Q.Promise}

@@ -197,6 +197,13 @@ Blockchain.prototype.popHeader = function() {
 }
 
 /**
+ * @return {number}
+ */
+Blockchain.prototype.getBlockCount = function() {
+  return this.headersCache.length
+}
+
+/**
  * @param {number} index
  * @return {string}
  * @throws {RangeError}
@@ -209,10 +216,15 @@ Blockchain.prototype.getHeader = function(index) {
 }
 
 /**
- * @return {number}
+ * @param {number} index
+ * @return {string}
+ * @throws {RangeError}
  */
-Blockchain.prototype.getBlockCount = function() {
-  return this.headersCache.length
+Blockchain.prototype.getChunk = function(index) {
+  if (index < 0 || index >= this.chunksCache.length)
+    throw new RangeError('Chunk not exists')
+
+  return this.chunksCache[index]
 }
 
 /**
@@ -303,7 +315,7 @@ Blockchain.prototype.importBlock = function(block, revert) {
 
       if (!revert) {
         var hexHeader = util.block2rawHeader(block).toString('hex')
-        yield self.storage.pushHeader(block.height, hexHeader)
+        yield self.storage.pushHeader(hexHeader, block.height)
         self.pushHeader(hexHeader)
 
       } else {
@@ -440,18 +452,6 @@ Blockchain.prototype.mainIteration = function() {
 
     setTimeout(self.mainIteration.bind(self), 10*1000)
   })
-}
-
-/**
- * @param {number} index
- * @return {string}
- * @throws {RangeError}
- */
-Blockchain.prototype.getChunk = function(index) {
-  if (index < 0 || index >= this.chunksCache.length)
-    throw new RangeError('Chunk not exists')
-
-  return this.chunksCache[index]
 }
 
 /**
