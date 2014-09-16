@@ -38,7 +38,7 @@ Storage.prototype.getAllHeaders = function() {}
  * @param {number} cHeight
  * @return {Q.Promise}
  */
-Storage.prototype.addCoin = function(address, cTxId, cIndex, cValue, cHeight) {}
+Storage.prototype.addCoin = function() {}
 
 /**
  * @abstract
@@ -46,25 +46,24 @@ Storage.prototype.addCoin = function(address, cTxId, cIndex, cValue, cHeight) {}
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-Storage.prototype.removeCoin = function(cTxId, cIndex) {}
+Storage.prototype.removeCoin = function() {}
 
 /**
  * @abstract
  * @param {string} cTxId
  * @param {number} cIndex
  * @param {string} sTxId
- * @param {number} sIndex
  * @param {number} sHeight
  * @return {Q.Promise}
  */
-Storage.prototype.setSpent = function(cTxId, cIndex, sTxId, sIndex, sHeight) {}
+Storage.prototype.setSpent = function() {}
 
 /**
  * @abstract
- * @param {string} sTxId
- * @param {number} sIndex
+ * @param {string} cTxId
+ * @param {number} cIndex
  */
-Storage.prototype.setUnspent = function(cTxId, cIndex) {}
+Storage.prototype.setUnspent = function() {}
 
 /**
  * @abstract
@@ -72,28 +71,14 @@ Storage.prototype.setUnspent = function(cTxId, cIndex) {}
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-Storage.prototype.getAddress = function(cTxId, cIndex) {}
+Storage.prototype.getAddress = function() {}
 
 /**
  * @abstract
  * @param {string} address
  * @return {Q.Promise}
  */
-Storage.prototype.getBalance = function(address) {}
-
-/**
- * @abstract
- * @param {string} address
- * @return {Q.Promise}
- */
-Storage.prototype.getCoins = function(address) {}
-
-/**
- * @abstract
- * @param {string} address
- * @return {Q.Promise}
- */
-Storage.prototype.getUnspentCoins = function(address) {}
+Storage.prototype.getCoins = function() {}
 
 
 module.exports = Storage

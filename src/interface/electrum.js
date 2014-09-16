@@ -161,17 +161,14 @@ Electrum.prototype.newRequest = function(client, request) {
           throw new Error('Not implemented yet')
 
         case 'blockchain.address.get_balance':
-          result = yield self.blockchain.getBalance(params[0])
+          result = yield self.getBalance(params[0])
           break
 
         case 'blockchain.address.get_proof':
           throw new Error('Not implemented yet')
 
         case 'blockchain.address.listunspent':
-          var unspentCoins = yield self.blockchain.getUnspentCoins(params[0])
-          result = unspentCoins.map(function(coin) {
-            return { tx_hash: coin.txId, tx_pos: coin.outIndex, value: coin.value, height: coin.height }
-          })
+          result = yield self.getUnspentCoins(params[0])
           break
 
         case 'blockchain.utxo.get_address':
@@ -179,19 +176,7 @@ Electrum.prototype.newRequest = function(client, request) {
           break
 
         case 'blockchain.block.get_header':
-          var header = self.blockchain.getHeader(parseInt(params[0]))
-          header = util.rawHeader2block(new Buffer(header, 'hex'))
-          result = {
-            block_height: parseInt(params[0]),
-            version: header.version,
-            prev_block_hash: header.previousblockhash,
-            merkle_root: header.merkleroot,
-            timestamp: header.time,
-            bits: parseInt(header.bits, 16),
-            nonce: header.nonce,
-          }
-          if (result.prev_block_hash === '0000000000000000000000000000000000000000000000000000000000000000')
-            result.prev_block_hash = null
+          result = yield self.getHeader(parseInt(params[0]))
           break
 
         case 'blockchain.block.get_chunk':
@@ -203,13 +188,7 @@ Electrum.prototype.newRequest = function(client, request) {
           break
 
         case 'blockchain.transaction.get_merkle':
-          var height = parseInt(params[1])
-          var merkle = yield self.blockchain.getMerkle(params[0], height)
-          result = {
-            block_height: height,
-            merkle: merkle.tree,
-            pos: merkle.pos
-          }
+          result = yield self.getMerkle(params[0], parseInt(params[1]))
           break
 
         case 'blockchain.transaction.get':
@@ -253,6 +232,17 @@ Electrum.prototype.newRequest = function(client, request) {
  * @param {string} address
  * @return {Q.Promise}
  */
+Electrum.prototype.getAddressStatus = function(address) {
+  return this.getHistory(address).then(function(history) {
+    var status = history.map(function(entry) { return entry.tx_hash + ':' + entry.height + ':' }).join('')
+    return util.sha256(status).toString('hex')
+  })
+}
+
+/**
+ * @param {string} address
+ * @return {Q.Promise}
+ */
 Electrum.prototype.getHistory = function(address) {
   return this.blockchain.getCoins(address).then(function(coins) {
     var history = []
@@ -270,10 +260,81 @@ Electrum.prototype.getHistory = function(address) {
  * @param {string} address
  * @return {Q.Promise}
  */
-Electrum.prototype.getAddressStatus = function(address) {
-  return this.getHistory(address).then(function(history) {
-    var status = history.map(function(entry) { return entry.tx_hash + ':' + entry.height + ':' }).join('')
-    return util.sha256(status).toString('hex')
+Electrum.prototype.getBalance = function(address) {
+  return this.blockchain.getCoins(address).then(function(coins) {
+    var result = { confirmed: 0, unconfirmed: 0 }
+
+    coins.forEach(function(coin) {
+      // confirmed and not spend
+      if (coin.cHeight !== 0 && coin.sHeight === null) {
+        result.confirmed += coin.cValue
+        return
+      }
+
+      // confirmed and spend not confirmed
+      if (coin.cHeight !== 0 && coin.sHeight === 0) {
+        result.unconfirmed -= coin.cValue
+        return
+      }
+
+      // unconfirmed and not spend
+      if (coin.cHeight === 0 && coin.sHeight === null) {
+        result.unconfirmed += coin.cValue
+        return
+      }
+    })
+
+    return result
+  })
+}
+
+/**
+ * @param {string} address
+ * @return {Q.Promise}
+ */
+Electrum.prototype.getUnspentCoins = function(address) {
+  return this.blockchain.getCoins(address).then(function(coins) {
+    coins = coins.filter(function(coin) { return coin.cHeight !== 0 && coin.sTxId === null })
+    coins = coins.map(function(coin) {
+      return { tx_hash: coin.cTxId, tx_pos: coin.cIndex, value: coin.cValue, height: coin.cHeight }
+    })
+    return coins
+  })
+}
+
+/**
+ * @param {number} height
+ * @return {Q.Promise}
+ */
+Electrum.prototype.getHeader = function(height) {
+  var header = this.blockchain.getHeader(height)
+  header = util.rawHeader2block(new Buffer(header, 'hex'))
+  var result = {
+    block_height: height,
+    version: header.version,
+    prev_block_hash: header.previousblockhash,
+    merkle_root: header.merkleroot,
+    timestamp: header.time,
+    bits: parseInt(header.bits, 16),
+    nonce: header.nonce,
+  }
+  if (result.prev_block_hash === '0000000000000000000000000000000000000000000000000000000000000000')
+    result.prev_block_hash = null
+  return result
+}
+
+/**
+ * @param {string} txId
+ * @param {number} height
+ * @return {Q.Promise}
+ */
+Electrum.prototype.getMerkle = function(txId, height) {
+  return this.blockchain.getMerkle(txId, height).then(function(merkle) {
+    return {
+      block_height: height,
+      merkle: merkle.tree,
+      pos: merkle.pos
+    }
   })
 }
 

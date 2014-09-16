@@ -28,7 +28,8 @@ module.exports = function(grunt) {
       test: {
         src: ['test/*.js'],
         options: {
-          reporter: 'spec'
+          reporter: 'spec',
+          timeout: 10*1000
         }
       }
     }

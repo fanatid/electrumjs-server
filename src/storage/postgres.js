@@ -6,7 +6,7 @@ var pg = require('pg')
 var Q = require('q')
 
 var Storage = require('./storage')
-var storageVersion = 2
+var storageVersion = 3
 
 
 var SQL_INFO_EXISTS = [
@@ -44,14 +44,12 @@ var SQL_HISTORY_CREATE_TABLE = [
   '   cValue  BIGINT NOT NULL, ',
   '   cHeight INTEGER NOT NULL, ',
   '   sTxId   BYTEA, ',
-  '   sIndex  BIGINT, ',
   '   sHeight INTEGER, ',
   '   PRIMARY KEY (cTxId, cIndex) ',
   ' ) '
 ].join('')
 
 var SQL_HISTORY_CREATE_INDEX_ADDRESS = 'CREATE INDEX history_address_idx ON history (address)'
-var SQL_HISTORY_CREATE_INDEX_UNSPENT = 'CREATE INDEX history_unspent_idx ON history (address, sheight)'
 
 
 /**
@@ -96,7 +94,6 @@ PostgresStorage.prototype.initialize = function() {
 
         yield self.query(SQL_HISTORY_CREATE_TABLE)
         yield self.query(SQL_HISTORY_CREATE_INDEX_ADDRESS)
-        yield self.query(SQL_HISTORY_CREATE_INDEX_UNSPENT)
 
       }
 
@@ -188,24 +185,23 @@ PostgresStorage.prototype.removeCoin = function(cTxId, cIndex) {
  * @param {string} cTxId
  * @param {number} cIndex
  * @param {string} sTxId
- * @param {number} sIndex
  * @param {number} sHeight
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.setSpent = function(cTxId, cIndex, sTxId, sIndex, sHeight) {
-  var sql = 'UPDATE history SET sTxId=$3, sIndex=$4, sHeight=$5 WHERE cTxId=$1 AND cIndex=$2'
-  var params = [new Buffer(cTxId, 'hex'), cIndex, new Buffer(sTxId, 'hex'), sIndex, sHeight]
+PostgresStorage.prototype.setSpent = function(cTxId, cIndex, sTxId, sHeight) {
+  var sql = 'UPDATE history SET sTxId=$3, sHeight=$4 WHERE cTxId=$1 AND cIndex=$2'
+  var params = [new Buffer(cTxId, 'hex'), cIndex, new Buffer(sTxId, 'hex'), sHeight]
 
   return this.query(sql, params)
 }
 
 /**
- * @param {string} sTxId
- * @param {number} sIndex
+ * @param {string} cTxId
+ * @param {number} cIndex
  */
 PostgresStorage.prototype.setUnspent = function(cTxId, cIndex) {
-  var sql = 'UPDATE history SET sTxId=$3, sIndex=$4, sHeight=$5 WHERE cTxId=$1 AND cIndex=$2'
-  var params = [new Buffer(cTxId, 'hex'), cIndex, null, null, null]
+  var sql = 'UPDATE history SET sTxId=$3, sHeight=$4 WHERE cTxId=$1 AND cIndex=$2'
+  var params = [new Buffer(cTxId, 'hex'), cIndex, null, null]
 
   return this.query(sql, params)
 }
@@ -231,54 +227,28 @@ PostgresStorage.prototype.getAddress = function(cTxId, cIndex) {
  * @param {string} address
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.getBalance = function(address) {
-  var sql = 'SELECT SUM(cValue) FROM history WHERE address = $1'
-  var params = [base58check.decode(address)]
-
-  return this.query(sql, params).then(function(result) {
-    return parseInt(result.rows[0].sum) || 0
-  })
-}
-
-/**
- * @param {string} address
- * @return {Q.Promise}
- */
 PostgresStorage.prototype.getCoins = function(address) {
-  var sql = 'SELECT cTxId, cHeight, sTxId, sHeight FROM history WHERE address = $1'
+  var sql = 'SELECT * FROM history WHERE address = $1'
   var params = [base58check.decode(address)]
 
   return this.query(sql, params).then(function(result) {
     function row2history(row) {
-      var obj = { cTxId: row.ctxid.toString('hex'), cHeight: row.cheight }
+      var obj = {
+        cTxId: row.ctxid.toString('hex'),
+        cIndex: parseInt(row.cindex),
+        cValue: parseInt(row.cvalue),
+        cHeight: row.cheight,
+        sTxId: null,
+        sHeight: null
+      }
+
       if (row.stxid !== null)
         obj = _.extend(obj, { sTxId: row.stxid.toString('hex'), sHeight: row.sheight })
+
       return obj
     }
 
     return result.rows.map(row2history)
-  })
-}
-
-/**
- * @param {string} address
- * @return {Q.Promise}
- */
-PostgresStorage.prototype.getUnspentCoins = function(address) {
-  var sql = 'SELECT cTxId, cIndex, cValue, cHeight FROM history WHERE address = $1 and sHeight is NULL'
-  var params = [base58check.decode(address)]
-
-  return this.query(sql, params).then(function(result) {
-    function row2coin(row) {
-      return {
-        txId: row.ctxid.toString('hex'),
-        outIndex: parseInt(row.cindex),
-        value: parseInt(row.cvalue),
-        height: row.cheight
-      }
-    }
-
-    return result.rows.map(row2coin)
   })
 }
 

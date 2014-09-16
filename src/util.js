@@ -94,6 +94,8 @@ function rawHeader2block(rawHeader) {
 
 
 module.exports = {
+  Set: require('set'),
+
   sha256: sha256,
   hash256: hash256,
   hashEncode: hashEncode,

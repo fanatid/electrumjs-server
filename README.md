@@ -15,14 +15,15 @@ Features
 Todo
 ----
 
-  * Blockchain mempool
+  * <s>Blockchain history</s>
+  * <s>Blockchain mempool</s>
   * <s>Electrum server interface</s>
   * IRC for communicate with other electrum servers
   * <s>TCP transport</s>
   * HTTP transport
   * Socket.IO transport ?
   * Logging (winston?)
-  * Tests
+  * <s>Tests</s>
 
 License
 -------
