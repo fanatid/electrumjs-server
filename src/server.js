@@ -18,6 +18,9 @@ var Electrum = require('./interface/electrum')
 
 Q.spawn(function* () {
   try {
+    if (!_.isUndefined(global.gc))
+      setInterval(global.gc, 10*1000)
+
     var blockchain = new Blockchain()
     yield blockchain.initialize()
 
@@ -33,7 +36,7 @@ Q.spawn(function* () {
 
   } catch (error) {
     console.log(error)
-    process.kill(process.pid, 'SIGINT')
+    process.kill(process.pid, 'SIGINT') // wait blockchain
 
   }
 })

@@ -8,7 +8,7 @@ Features
 
   * Language: JavaScript
   * Only node.js with harmony mode (>=v0.11)
-  * Storage backend: PostgreSQL
+  * Supported storage: PostgreSQL, <s>Redis</s>
   * Required bitcoind
   * Testnet support
 
@@ -18,7 +18,7 @@ Todo
   * <s>Blockchain history</s>
   * <s>Blockchain mempool</s>
   * <s>Electrum server interface</s>
-  * IRC for communicate with other electrum servers
+  * <s>IRC for communicate with other electrum servers</s>
   * <s>TCP transport</s>
   * HTTP transport
   * Socket.IO transport ?

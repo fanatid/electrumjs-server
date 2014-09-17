@@ -1,6 +1,7 @@
+var inherits = require('util').inherits
+
 var base58check = require('bs58check')
 var config = require('config')
-var inherits = require('util').inherits
 var _ = require('lodash')
 var pg = require('pg')
 var Q = require('q')
@@ -105,9 +106,9 @@ PostgresStorage.prototype.initialize = function() {
 
       /** check network */
       row = (yield self.query('SELECT value FROM info WHERE key = $1', ['network'])).rows[0]
-      var network = JSON.parse(row.value)
-      if (network !== serverNetwork)
-        throw new Error('Server network is ' + serverNetwork + ', whereas db network is ' + network)
+      var dbNetwork = JSON.parse(row.value)
+      if (dbNetwork !== serverNetwork)
+        throw new Error('Server network is ' + serverNetwork + ', whereas db network is ' + dbNetwork)
 
       /** done */
       console.log('Storage (PostgreSQL) created')

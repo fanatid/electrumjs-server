@@ -98,14 +98,19 @@ Blockchain.prototype.initialize = function() {
 
       /** create storage */
       switch (config.get('server.storage')) {
-        case 'mongodb':
-          var MongoStorage = require('./storage.mongo')
+        case 'mongo':
+          var MongoStorage = require('./storage/mongo')
           self.storage = new MongoStorage()
           break
 
         case 'postgres':
           var PostgresStorage = require('./storage/postgres')
           self.storage = new PostgresStorage()
+          break
+
+        case 'redis':
+          var RedisStorage = require('./storage/redis')
+          self.storage = new RedisStorage()
           break
 
         default:
@@ -150,12 +155,12 @@ Blockchain.prototype.initialize = function() {
 Blockchain.prototype.pushHeader = function(hexHeader) {
   /** update chunks (2016 headers include) */
   if (this.chunksCache.length === 0) {
-    this.chunksCache[0] = [hexHeader]
+    this.chunksCache[0] = hexHeader
     return
   }
 
   if (this.chunksCache[this.chunksCache.length - 1].length === 322560) {
-    this.chunksCache.push([hexHeader])
+    this.chunksCache.push(hexHeader)
     return
   }
 
@@ -182,7 +187,7 @@ Blockchain.prototype.popHeader = function() {
  */
 Blockchain.prototype.getBlockCount = function() {
   var chunksCacheLength = this.chunksCache.length
-  return (chunksCacheLength-1) * 2016 + this.chunksCache[chunksCacheLength-1].length / 160
+  return Math.max(0, chunksCacheLength-1) * 2016 + (this.chunksCache[chunksCacheLength-1] || '').length / 160
 }
 
 /**

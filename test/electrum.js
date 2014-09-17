@@ -22,6 +22,7 @@ function electrumTests(data) {
           var exceptMethods = [
             'blockchain.headers.subscribe',
             'blockchain.numblocks.subscribe',
+            'blockchain.estimatefee',
             'server.banner',
             'server.donation_address',
             'server.peers.subscribe'
