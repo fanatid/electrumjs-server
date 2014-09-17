@@ -1,143 +1,17 @@
-var dns = require('dns')
-var events = require('events')
 var inherits = require('util').inherits
 
 var config = require('config')
-var irc = require('irc')
 var _ = require('lodash')
 var Q = require('q')
 
 var Interface = require('./interface')
+var ElectrumIRCClient = require('../peers/electrum')
 var TCPTransport = require('../transport/tcp')
 var util = require('../util')
 
-var electrumVersion = '0.9'
+var electrumVersion = require('../version').interface.electrum
 var serverBanner = (config.get('electrum.banner') || '').replace(/\\n/g,'\n')
 var serverDonationAddress = config.get('electrum.donationAddress') || ''
-
-
-/**
- * @event ElectrumIRCClient#addPeer
- * @type {Object}
- * @property {string} nick
- * @property {string} address
- * @property {string} host
- * @property {string} ports
- */
-
-/**
- * @event ElectrumIRCClient#removePeer
- * @type {Object}
- * @property {string} nick
- */
-
-/**
- * @class ElectrumIRCClient
- */
-function ElectrumIRCClient() {
-  events.EventEmitter.call(this)
-  this._isInialized = false
-}
-
-inherits(ElectrumIRCClient, events.EventEmitter)
-
-/**
- * @return {Q.Promise}
- */
-ElectrumIRCClient.prototype.initialize = function() {
-  var self = this
-  if (self._isInialized)
-    return Q()
-
-  self._isInialized = true
-
-  var deferred = Q.defer()
-
-  var realName = config.get('electrum.irc.reportHost') + ' v' + electrumVersion + ' '
-  function addPort(letter, number) {
-    if ({'t':'50001', 's':'50002', 'h':'8081', 'g':'8082'}[letter] === number)
-      realName += letter + ' '
-    else
-      realName += letter + number + ' '
-  }
-  config.get('electrum.transport').map(function(transport) {
-    switch (transport.type) {
-      case 'tcp':
-        addPort('t', transport.port)
-        break
-      case 'tcpSSL':
-        addPort('s', transport.port)
-        break
-      case 'http':
-        addPort('h', transport.port)
-        break
-      case 'httpSSL':
-        addPort('g', transport.port)
-        break
-      default:
-        break
-    }
-  })
-
-  var client = new irc.Client('irc.freenode.net', 'E_' + config.get('electrum.irc.nick'), {
-    realName: realName,
-    port: 6667,
-    autoConnect: true,
-    channels: ['#electrum']
-  })
-
-  client.on('registered', function(message) {
-    console.log('Electrum IRC connected')
-    deferred.resolve()
-  })
-
-  client.on('names#electrum', function(nicks) {
-    Object.keys(nicks).forEach(function(nick) {
-      if (nick.indexOf('E_') === 0)
-        client.send('WHO', nick)
-    })
-  })
-
-  client.on('join#electrum', function(nick) {
-    if (nick.indexOf('E_') === 0)
-      client.send('WHO', nick)
-  })
-
-  client.on('quit', function(nick) {
-    self.emit('removePeer', { nick: nick })
-  })
-
-  client.on('kick#electrum', function(nick) {
-    self.emit('removePeer', { nick: nick })
-  })
-
-  client.on('raw', function(message) {
-    if (message.command !== 'rpl_whoreply')
-      return
-
-    var items = (message.args[7] || '').split(' ')
-    dns.resolve(items[1], function(error, addresses) {
-      if (error || addresses.length === 0) {
-        console.error('dns.resolve error: ', error, '(addresses: ' + addresses + ')')
-        return
-      }
-
-      self.emit('addPeer', {
-        nick: message.args[5],
-        address: addresses[0],
-        host: items[1],
-        ports: items.slice(2)
-      })
-    })
-  })
-
-  client.on('error', function(error) {
-    console.error('ElectrumIRC error:', error)
-    deferred.reject(error)
-  })
-
-  return deferred.promise
-}
 
 
 /**

@@ -7,7 +7,7 @@ var pg = require('pg')
 var Q = require('q')
 
 var Storage = require('./storage')
-var storageVersion = 3
+var storageVersion = require('../version').storage.postgres
 
 
 var SQL_INFO_EXISTS = [
