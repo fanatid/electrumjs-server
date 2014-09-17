@@ -8,7 +8,7 @@ Features
 
   * Language: JavaScript
   * Only node.js with harmony mode (>=v0.11)
-  * Supported storage: PostgreSQL, <s>Redis</s>
+  * Supported storage: PostgreSQL, Redis
   * Required bitcoind
   * Testnet support
 
@@ -21,7 +21,10 @@ Todo
   * <s>IRC for communicate with other electrum servers</s>
   * <s>TCP transport</s>
   * HTTP transport
+  * SSL support
   * Socket.IO transport ?
+  * Add storage: mongodb? node.js c++ addon? leveldb?
+  * Add litecoin support
   * Logging (winston?)
   * <s>Tests</s>
 
