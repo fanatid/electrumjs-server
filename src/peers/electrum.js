@@ -64,11 +64,36 @@ function ElectrumIRCClient() {
   IRCClient.call(this)
 
   this._isInialized = false
-  this.client = new irc.Client('irc.freenode.net', 'E_' + config.get('electrum.irc.nick'), {
+
+  // not throw exception, already validated in blockchain
+  switch (config.get('server.network')) {
+    case 'bitcoin':
+      this.nickPrefix = 'E_'
+      break
+
+    case 'testnet':
+      this.nickPrefix = 'ET_'
+      break
+
+    case 'litecoin':
+      this.nickPrefix = 'EL_'
+      break
+
+    case 'litecoin-testnet':
+      this.nickPrefix = 'ELT_'
+      break
+  }
+
+  var nickName = this.nickPrefix + config.get('electrum.irc.nick')
+  var channel = '#electrum'
+  if (this.nickPrefix === 'EL_' || this.nickPrefix === 'ELT_')
+    channel = '#electrum-ltc'
+
+  this.client = new irc.Client('irc.freenode.net', nickName, {
     realName: getRealName(),
     port: 6667,
     autoConnect: false,
-    channels: ['#electrum']
+    channels: [channel]
   })
 }
 
@@ -95,13 +120,13 @@ ElectrumIRCClient.prototype.initialize = function() {
 
   self.client.on('names#electrum', function(nicks) {
     Object.keys(nicks).forEach(function(nick) {
-      if (nick.indexOf('E_') === 0)
+      if (nick.indexOf(self.nickPrefix) === 0)
         self.client.send('WHO', nick)
     })
   })
 
   self.client.on('join#electrum', function(nick) {
-    if (nick.indexOf('E_') === 0)
+    if (nick.indexOf(self.nickPrefix) === 0)
       self.client.send('WHO', nick)
   })
 

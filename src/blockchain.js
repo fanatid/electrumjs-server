@@ -78,11 +78,14 @@ Blockchain.prototype.initialize = function() {
     return Q()
 
   self._isInialized = true
-  self.network = bitcoin.networks[config.get('server.network')]
 
   var deferred = Q.defer()
   Q.spawn(function* () {
     try {
+      self.network = bitcoin.networks[config.get('server.network')]
+      if (_.isUndefined(self.network))
+        throw new Error('Unknow server.network: ' + config.get('server.network'))
+
       /** create bitcoind client and check network */
       self.bitcoindClient = new bitcoind.Client({
         host: config.get('bitcoind.host'),
