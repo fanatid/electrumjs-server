@@ -34,7 +34,6 @@ MongoStorage.prototype.initialize = function() {
   var deferred = Q.defer()
   Q.spawn(function* () {
     try {
-      var row
       var serverNetwork = config.get('server.network')
 
       /** connect to db */

@@ -133,10 +133,10 @@ Blockchain.prototype.initialize = function() {
       /** sync storage with bitcoind */
       yield self.catchUp()
       /** catch up new blocks and get info from mempool */
-      self.mempool = { txIds: {}, addresses: {}, spent: {}, unspent: {} }
+      self.mempool = { txIds: {}, spent: {}, addrs: {}, coins: {} }
       self.on('newHeight', function() {
         console.log('clear mempool')
-        self.mempool = { txIds: {}, addresses: {}, spent: {}, unspent: {} }
+        self.mempool = { txIds: {}, spent: {}, addrs: {}, coins: {} }
       })
       process.nextTick(self.mainIteration.bind(self))
 
@@ -400,9 +400,9 @@ Blockchain.prototype.updateMempool = function() {
   /**
    * mempool structure
    *  txIds: {txId: true}
-   *  addresses: {txId: {cIndex: addr}}
-   *  spent: {addr: {cTxId: {cIndex: {sTxId: string, cValue: ?number}}}}
-   *  unspent: {addr: {cTxId: {cIndex: cValue}}}
+   *  spent: {cTxId: {cIndex: sTxId}}
+   *  addrs: {sTxId+sIndex: address}
+   *  coins: {address: {cTxId: {cIndex: cValue}}}
    */
 
   var deferred = Q.defer()
@@ -413,7 +413,6 @@ Blockchain.prototype.updateMempool = function() {
         added: 0,
         touchedAddress: new util.Set()
       }
-      var address
 
       var mempoolTxIds = (yield self.bitcoind('getrawmempool'))[0]
       // need toposort?
@@ -428,45 +427,51 @@ Blockchain.prototype.updateMempool = function() {
         var rawTx = (yield self.bitcoind('getrawtransaction', txId))[0]
         var tx = bitcoin.Transaction.fromHex(rawTx)
 
-        for (var inIndex = 0; inIndex < tx.ins.length; ++ inIndex) {
-          var input = tx.ins[inIndex]
+        tx.ins.forEach(function(input) {
           var cTxId = util.hashEncode(input.hash)
-          var cValue = null
+          var cIndex = input.index
 
-          address = yield self.storage.getAddress(cTxId, input.index)
-          if (address === null) {
-            address = (self.mempool.addresses[cTxId] || {})[input.index] || null
-            if (address !== null) {
-              cValue = self.mempool.unspent[address][cTxId][input.index]
-              delete self.mempool.unspent[address][cTxId][input.index]
-            }
-          }
+          self.mempool.spent[cTxId] = self.mempool.spent[cTxId] || {}
+          self.mempool.spent[cTxId][cIndex] = txId
 
-          if (address !== null) {
-            self.mempool.spent[address] = self.mempool.spent[address] || {}
-            self.mempool.spent[address][cTxId] = self.mempool.spent[address][cTxId] || {}
-            self.mempool.spent[address][cTxId][input.index] = { sTxId: txId, cValue: cValue }
+          stat.touchedAddress.add([cTxId, cIndex].join(','))
+        })
 
-            stat.touchedAddress.add(address)
-          }
-        }
-
-        for (var outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
-          var output = tx.outs[outIndex]
-          address = bitcoin.Address.fromOutputScript(output.script, self.network)
+        tx.outs.forEach(function(output, outIndex) {
+          var address = bitcoin.Address.fromOutputScript(output.script, self.network)
           if (address === null)
-            continue
+            return
 
-          self.mempool.addresses[txId] = self.mempool.addresses[txId] || {}
-          self.mempool.addresses[txId][outIndex] = address
+          self.mempool.addrs[txId + outIndex] = address
 
-          self.mempool.unspent[address] = self.mempool.unspent[address] || {}
-          self.mempool.unspent[address][txId] = self.mempool.unspent[address][txId] || {}
-          self.mempool.unspent[address][txId][outIndex] = output.value
+          self.mempool.coins[address] = self.mempool.coins[address] || {}
+          self.mempool.coins[address][txId] = self.mempool.coins[address][txId] || {}
+          self.mempool.coins[address][txId][outIndex] = output.value
 
           stat.touchedAddress.add(address)
-        }
+        })
       }
+
+      var promises = []
+      stat.touchedAddress.get().forEach(function(addr) {
+        var items = addr.split(',')
+        if (items.length === 1)
+          return
+
+        stat.touchedAddress.remove(addr)
+        if (!_.isUndefined(self.mempool.addrs[addr])) {
+          stat.touchedAddress.add(self.mempool.addrs[addr])
+          return
+        }
+
+        promises.push(self.storage.getAddress(items[0], parseInt(items[1])).then(function(addr) {
+          if (addr !== null)
+            stat.touchedAddress.add(addr)
+        }))
+      })
+      Q.all(promises).then(function() {
+        stat.touchedAddress.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
+      })
 
       var msg = [
         'update mempool',
@@ -475,7 +480,6 @@ Blockchain.prototype.updateMempool = function() {
         (Date.now() - stat.st) + 'ms'
       ]
       console.log(msg.join(', '))
-      stat.touchedAddress.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
       deferred.resolve()
 
     } catch(error) {
@@ -511,13 +515,10 @@ Blockchain.prototype.mainIteration = function() {
  * @return {Q.Promise}
  */
 Blockchain.prototype.getAddress = function(txId, outIndex) {
-  return this.storage.getAddress(txId, outIndex).then(function(address) {
-    if (address === null)
-      address = (this.mempool.addresses[txId] || {})[outIndex] || null
+  if (!_.isUndefined(this.mempool.addrs[txId + outIndex]))
+    return Q(this.mempool.addrs[txId + outIndex])
 
-    return address
-
-  }.bind(this))
+  return this.storage.getAddress(txId, outIndex)
 }
 
 /**
@@ -528,44 +529,29 @@ Blockchain.prototype.getCoins = function(address) {
   var self = this
 
   return self.storage.getCoins(address).then(function(coins) {
-    var spent = self.mempool.spent[address] || {}
-    var usedTx = {}
-    coins.forEach(function(coin) {
-      if (_.isUndefined(spent[coin.cTxId]))
-        return
-
-      coin.sTxId = spent[coin.cTxId][coin.cIndex].sTxId
-      coin.sHeight = 0
-      usedTx[coin.cTxId] = true
-    })
-    Object.keys(spent).forEach(function(cTxId) {
-      if (usedTx[cTxId])
-        return
-
-      Object.keys(spent[cTxId]).forEach(function(cIndex) {
+    // add unconfirmed coins
+    var mempoolCoins = self.mempool.coins[address] || {}
+    Object.keys(mempoolCoins).forEach(function(cTxId) {
+      Object.keys(mempoolCoins[cTxId]).forEach(function(cIndex) {
         coins.push({
           cTxId: cTxId,
           cIndex: cIndex,
-          cValue: spent[cTxId][cIndex].cValue,
+          cValue: mempoolCoins[cTxId][cIndex],
           cHeight: 0,
-          sTxId: spent[cTxId][cIndex].sTxId,
+          sTxId: null,
           sHeight: 0
         })
       })
     })
 
-    var unspent = self.mempool.unspent[address] || {}
-    Object.keys(unspent).forEach(function(cTxId) {
-      Object.keys(unspent[cTxId]).forEach(function(cIndex) {
-        coins.push({
-          cTxId: cTxId,
-          cIndex: cIndex,
-          cValue: unspent[cTxId][cIndex],
-          cHeight: 0,
-          sTxId: null,
-          sHeight: null
-        })
-      })
+    // fill unconfirmed spent coins
+    coins.forEach(function(coin) {
+      var sTxId = (self.mempool.spent[coin.cTxId] || {})[coin.cIndex]
+      if (_.isUndefined(sTxId))
+        return
+
+      coin.sTxId = sTxId
+      coin.sHeight = 0
     })
 
     return coins

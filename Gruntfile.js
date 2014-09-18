@@ -10,6 +10,7 @@ module.exports = function(grunt) {
         immed: true,
         indent: 2,
         latedef: true,
+        loopfunc: true,
         maxcomplexity: 10,
         maxlen: 120,
         noarg: true,
