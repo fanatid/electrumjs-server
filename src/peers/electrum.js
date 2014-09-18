@@ -79,7 +79,7 @@ function ElectrumIRCClient() {
       this.nickPrefix = 'EL_'
       break
 
-    case 'litecoin-testnet':
+    case 'litecoin_testnet':
       this.nickPrefix = 'ELT_'
       break
   }

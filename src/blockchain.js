@@ -8,6 +8,7 @@ var bufferEqual = require('buffer-equal')
 var _ = require('lodash')
 var Q = require('q')
 
+var networks = require('./networks')
 var util = require('./util')
 
 
@@ -82,7 +83,7 @@ Blockchain.prototype.initialize = function() {
   var deferred = Q.defer()
   Q.spawn(function* () {
     try {
-      self.network = bitcoin.networks[config.get('server.network')]
+      self.network = networks[config.get('server.network')]
       if (_.isUndefined(self.network))
         throw new Error('Unknow server.network: ' + config.get('server.network'))
 
