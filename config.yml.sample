@@ -4,6 +4,9 @@ server:
   interface:
     - electrum
 
+mongo:
+  url: mongodb://127.0.0.1:27017/database
+
 postgres:
   url: postgres://username:password@localhost/database
 
