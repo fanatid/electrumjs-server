@@ -61,6 +61,9 @@ Electrum.prototype.initialize = function() {
   })
 
   self.blockchain.on('touchedAddress', function(address) {
+    if (_.isUndefined(self.subscribers.address[address]))
+      return
+
     self.getAddressStatus(address).then(function(status) {
       var addressObj = { id: null, method: 'blockchain.address.subscribe', params: [address, status] }
       var clients = self.subscribers.address[address] || []
@@ -114,7 +117,11 @@ Electrum.prototype.newClient = function(client) {
     delete self.subscribers.numblocks[clientId]
     delete self.subscribers.headers[clientId]
     var clientAddresses = self.subscribers.clientAddresses[clientId] || []
-    clientAddresses.forEach(function(addr) { delete self.subscribers.address[addr][clientId] })
+    clientAddresses.forEach(function(addr) {
+      delete self.subscribers.address[addr][clientId]
+      if (Object.keys(self.subscribers.address[addr]).length === 0)
+        delete self.subscribers.address[addr]
+    })
     delete self.subscribers.clientAddresses[clientId]
   })
 }

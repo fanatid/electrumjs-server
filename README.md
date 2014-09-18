@@ -8,9 +8,9 @@ Features
 
   * Language: JavaScript
   * Only node.js with harmony mode (>=v0.11)
-  * Supported storage: PostgreSQL, Redis
   * Required bitcoind
-  * Testnet support
+  * Supported networks: bitcoin, testnet
+  * Supported storage: PostgreSQL, Redis
 
 Todo
 ----
@@ -24,7 +24,7 @@ Todo
   * SSL support
   * Socket.IO transport ?
   * Add storage: mongodb? node.js c++ addon? leveldb?
-  * Add litecoin support
+  * Litecoin support
   * Logging (winston?)
   * <s>Tests</s>
 
