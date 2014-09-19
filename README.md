@@ -23,7 +23,6 @@ Todo
   * HTTP transport
   * SSL support
   * Socket.IO transport ?
-  * Add storage: node.js c++ addon? leveldb?
   * Logging (winston?)
   * <s>Tests</s>
 

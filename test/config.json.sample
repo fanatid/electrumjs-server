@@ -5,9 +5,9 @@
       "host": "ecdsa.net",
       "port": 50001
     },
-    "tcp": {
-      "host": "ecdsa.net",
-      "port": 8000
+    "http": {
+      "host": "electrum.thwg.org",
+      "port": 8081
     }
   }
 }

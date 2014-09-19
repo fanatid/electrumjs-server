@@ -10,6 +10,8 @@ var electrumTest = require('./electrum')
 
 
 function TCPTransport(host, port) {
+  events.EventEmitter.call(this)
+
   var self = this
   self.nextRequestId = 0
 
