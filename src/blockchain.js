@@ -113,6 +113,7 @@ Blockchain.prototype.initialize = function() {
           break
 
         case 'redis':
+          throw new Error('Redis not supported now... (not with parallel transactions import)')
           var RedisStorage = require('./storage/redis')
           self.storage = new RedisStorage()
           break
@@ -292,20 +293,20 @@ Blockchain.prototype.catchUp = function() {
 Blockchain.prototype.importBlock = function(block, revert) {
   var self = this
 
-  if (_.isUndefined(revert))
-    revert = false
-
   var deferred = Q.defer()
   Q.spawn(function* () {
     try {
       var stat = {
-        st: Date.now(),
+        st: process.hrtime(),
         inputs: 0,
-        outputs: 0,
-        touchedAddress: new util.Set()
+        outputs: 0
       }
 
-      if (!revert) {
+      if (_.isUndefined(revert))
+        revert = false
+      var isImport = !revert
+
+      if (isImport) {
         var hexHeader = util.block2rawHeader(block).toString('hex')
         yield self.storage.pushHeader(hexHeader, block.height)
         self.pushHeader(hexHeader)
@@ -318,69 +319,85 @@ Blockchain.prototype.importBlock = function(block, revert) {
 
       self.updateLastBlockHash()
 
-      var address, inIndex, outIndex, input, cTxId
-      var currentHeight = self.getBlockCount() - 1
+      var importPromises = util.groupTransactions(block.tx).map(function(transactions) {
+        transactions.forEach(function(tx) {
+          stat.inputs += tx.ins.length
+          stat.outputs += tx.outs.length
+        })
 
-      for (var txIndex = 0; txIndex < block.tx.length; ++txIndex) {
-        var tx = block.tx[txIndex]
-        var txId = tx.getId()
+        return self.importTransactions(transactions, isImport)
+      })
+      yield Q.all(importPromises)
 
-        stat.inputs += tx.ins.length
-        stat.outputs += tx.outs.length
-
-        if (!revert) {
-          for (inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
-            input = tx.ins[inIndex]
-            cTxId = util.hashEncode(input.hash)
-            address = yield self.storage.getAddress(cTxId, input.index)
-            if (address === null)
-              continue
-
-            yield self.storage.setSpent(cTxId, input.index, txId, currentHeight)
-            stat.touchedAddress.add(address)
-          }
-
-          for (outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
-            var output = tx.outs[outIndex]
-            address = bitcoin.Address.fromOutputScript(output.script, self.network)
-            if (address === null)
-              continue
-
-            yield self.storage.addCoin(address, txId, outIndex, output.value, currentHeight)
-            stat.touchedAddress.add(address)
-          }
-        } else {
-          for (outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
-            address = yield self.storage.getAddress(txId, outIndex)
-            if (address === null)
-              continue
-
-            yield self.storage.removeCoin(txId, outIndex)
-            stat.touchedAddress.add(address)
-          }
-
-          for (inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
-            input = tx.ins[inIndex]
-            cTxId = util.hashEncode(input.hash)
-            address = yield self.storage.getAddress(cTxId, input.index)
-            if (address === null)
-              continue
-
-            yield self.storage.setUnspent(txId, input.index)
-            stat.touchedAddress.add(address)
-          }
-        }
-      }
+      var touchedAddress = yield self.storage.getTouchedAddresses(self.getBlockCount() - 1)
+      touchedAddress.forEach(function(addr) { self.emit('touchedAddress', addr) })
 
       /** done */
       var msg = [
         (revert ? 'revert' : 'import') + ' block #' + block.height,
         block.tx.length + ' transactions',
         stat.inputs + '/' + stat.outputs,
-        (Date.now() - stat.st) + 'ms'
+        util.spendTime(stat.st) + 'ms'
       ]
       console.log(msg.join(', '))
-      stat.touchedAddress.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
+      deferred.resolve()
+
+    } catch (error) {
+      deferred.reject(error)
+
+    }
+  })
+  return deferred.promise
+}
+
+/**
+ * @param {bitcoinjs-lib.Transaction[]} transactions
+ * @param {boolean} isImport
+ * @return {Q.Promise}
+ */
+Blockchain.prototype.importTransactions = function(transactions, isImport) {
+  var self = this
+
+  var deferred = Q.defer()
+  Q.spawn(function* () {
+    try {
+      var currentHeight = self.getBlockCount() - 1
+      var inIndex, outIndex, input, cTxId
+
+      if (!isImport)
+        transactions.reverse()
+
+      for (var txIndex = 0; txIndex < transactions.length; ++txIndex) {
+        var tx = transactions[txIndex]
+        var txId = tx.getId()
+
+        if (isImport) {
+          for (inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
+            input = tx.ins[inIndex]
+            cTxId = util.hashEncode(input.hash)
+            yield self.storage.setSpent(cTxId, input.index, txId, currentHeight)
+          }
+
+          for (outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
+            var output = tx.outs[outIndex]
+            var address = bitcoin.Address.fromOutputScript(output.script, self.network)
+            if (address === null)
+              continue
+
+            yield self.storage.addCoin(address, txId, outIndex, output.value, currentHeight)
+          }
+        } else {
+          for (outIndex = 0; outIndex < tx.outs.length; ++outIndex)
+            yield self.storage.removeCoin(txId, outIndex)
+
+          for (inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
+            input = tx.ins[inIndex]
+            cTxId = util.hashEncode(input.hash)
+            yield self.storage.setUnspent(txId, input.index)
+          }
+        }
+      }
+
       deferred.resolve()
 
     } catch (error) {
@@ -409,7 +426,7 @@ Blockchain.prototype.updateMempool = function() {
   Q.spawn(function* () {
     try {
       var stat = {
-        st: Date.now(),
+        st: process.hrtime(),
         added: 0,
         touchedAddress: new util.Set()
       }
@@ -477,7 +494,7 @@ Blockchain.prototype.updateMempool = function() {
         'update mempool',
         '+' + stat.added,
         'now: ' + Object.keys(self.mempool.txIds).length,
-        (Date.now() - stat.st) + 'ms'
+        util.spendTime(stat.st) + 'ms'
       ]
       console.log(msg.join(', '))
       deferred.resolve()

@@ -55,8 +55,10 @@ MongoStorage.prototype.initialize = function() {
       yield Q.ninvoke(self.headers, 'ensureIndex', 'height', { unique: true })
 
       self.history = yield Q.ninvoke(self.db, 'createCollection', 'history')
-      yield Q.ninvoke(self.history, 'ensureIndex', 'address')
       yield Q.ninvoke(self.history, 'ensureIndex', { cTxId: 1, cIndex: 1 })
+      yield Q.ninvoke(self.history, 'ensureIndex', 'address')
+      yield Q.ninvoke(self.history, 'ensureIndex', 'cHeight')
+      yield Q.ninvoke(self.history, 'ensureIndex', 'sHeight')
 
       /** done */
       console.log('Storage (MongoDB) created')
@@ -184,6 +186,20 @@ MongoStorage.prototype.getAddress = function(cTxId, cIndex) {
       return null
 
     return base58check.encode(doc.address.buffer)
+  })
+}
+
+/**
+ * @param {number} height
+ * @return {Q.Promise}
+ */
+MongoStorage.prototype.getTouchedAddresses = function(height) {
+  // http://docs.mongodb.org/manual/reference/method/db.collection.distinct ?
+  var query = { $or: [ { cHeight: height }, { sHeight: height } ] }
+
+  return Q.ninvoke(this.history.find(query), 'toArray').then(function(rows) {
+    var addresses = rows.map(function(row) { return base58check.encode(row.address.buffer) })
+    return _.uniq(addresses)
   })
 }
 

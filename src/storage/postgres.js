@@ -50,8 +50,6 @@ var SQL_HISTORY_CREATE_TABLE = [
   ' ) '
 ].join('')
 
-var SQL_HISTORY_CREATE_INDEX_ADDRESS = 'CREATE INDEX history_address_idx ON history (address)'
-
 
 /**
  * @class PostgresStorage
@@ -94,7 +92,9 @@ PostgresStorage.prototype.initialize = function() {
         yield self.query(SQL_HEADERS_CREATE_TABLE)
 
         yield self.query(SQL_HISTORY_CREATE_TABLE)
-        yield self.query(SQL_HISTORY_CREATE_INDEX_ADDRESS)
+        yield self.query('CREATE INDEX history_address_idx ON history (address)')
+        yield self.query('CREATE INDEX history_cheight_idx ON history (cHeight)')
+        yield self.query('CREATE INDEX history_sheight_idx ON history (sHeight)')
 
       }
 
@@ -221,6 +221,20 @@ PostgresStorage.prototype.getAddress = function(cTxId, cIndex) {
       return null
 
     return base58check.encode(result.rows[0].address)
+  })
+}
+
+/**
+ * @param {number} height
+ * @return {Q.Promise}
+ */
+PostgresStorage.prototype.getTouchedAddresses = function(height) {
+  var sql = 'SELECT DISTINCT address FROM history WHERE cHeight = $1 OR sHeight = $1'
+  var params = [height]
+
+  return this.query(sql, params).then(function(result) {
+    var addresses = _.pluck(result.rows, 'address')
+    return addresses.map(base58check.encode)
   })
 }
 

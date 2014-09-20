@@ -75,6 +75,13 @@ Storage.prototype.getAddress = function() {}
 
 /**
  * @abstract
+ * @param {number} height
+ * @return {Q.Promise}
+ */
+Storage.prototype.getTouchedAddresses = function() {}
+
+/**
+ * @abstract
  * @param {string} address
  * @return {Q.Promise}
  */

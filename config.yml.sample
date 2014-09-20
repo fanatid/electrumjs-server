@@ -10,11 +10,6 @@ mongo:
 postgres:
   url: postgres://username:password@localhost/database
 
-redis:
-  port: 6379
-  host: localhost
-  password: null
-
 electrum:
   banner: Welcome to Electrum!
   donationAddress:

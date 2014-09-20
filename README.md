@@ -10,21 +10,13 @@ Features
   * Only node.js with harmony mode (>=v0.11)
   * Required bitcoind
   * Supported networks: bitcoin, testnet, litecoin, litecoin-testnet
-  * Supported storage: MongoDB, PostgreSQL, Redis
+  * Supported storage: MongoDB, PostgreSQL
 
 Todo
 ----
 
-  * <s>Blockchain history</s>
-  * <s>Blockchain mempool</s>
-  * <s>Electrum server interface</s>
-  * <s>IRC for communicate with other electrum servers</s>
-  * <s>TCP transport</s>
-  * HTTP transport
   * SSL support
-  * Socket.IO transport ?
   * Logging (winston?)
-  * <s>Tests</s>
 
 License
 -------
