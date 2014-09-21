@@ -45,8 +45,7 @@ var SQL_HISTORY_CREATE_TABLE = [
   '   cValue  BIGINT NOT NULL, ',
   '   cHeight INTEGER NOT NULL, ',
   '   sTxId   BYTEA, ',
-  '   sHeight INTEGER, ',
-  '   PRIMARY KEY (cTxId, cIndex) ',
+  '   sHeight INTEGER ',
   ' ) '
 ].join('')
 
@@ -93,6 +92,7 @@ PostgresStorage.prototype.initialize = function() {
 
         yield self.query(SQL_HISTORY_CREATE_TABLE)
         yield self.query('CREATE INDEX history_address_idx ON history (address)')
+        yield self.query('CREATE INDEX history_ctxid_cindex_idx ON history (cTxId, cIndex)')
         yield self.query('CREATE INDEX history_cheight_idx ON history (cHeight)')
         yield self.query('CREATE INDEX history_sheight_idx ON history (sHeight)')
 

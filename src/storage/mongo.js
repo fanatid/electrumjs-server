@@ -55,8 +55,8 @@ MongoStorage.prototype.initialize = function() {
       yield Q.ninvoke(self.headers, 'ensureIndex', 'height', { unique: true })
 
       self.history = yield Q.ninvoke(self.db, 'createCollection', 'history')
-      yield Q.ninvoke(self.history, 'ensureIndex', { cTxId: 1, cIndex: 1 })
       yield Q.ninvoke(self.history, 'ensureIndex', 'address')
+      yield Q.ninvoke(self.history, 'ensureIndex', { cTxId: 1, cIndex: 1 })
       yield Q.ninvoke(self.history, 'ensureIndex', 'cHeight')
       yield Q.ninvoke(self.history, 'ensureIndex', 'sHeight')
 

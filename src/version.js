@@ -4,7 +4,7 @@ module.exports = {
   },
   storage: {
     mongo: '2',
-    postgres: '4',
+    postgres: '5',
     redis: '1'
   }
 }
