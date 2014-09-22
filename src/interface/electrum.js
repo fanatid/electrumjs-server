@@ -10,7 +10,7 @@ var TCPTransport = require('../transport/tcp')
 var util = require('../util')
 
 var electrumVersion = require('../version').interface.electrum
-var serverBanner = (config.get('electrum.banner') || '').replace(/\\n/g,'\n')
+var serverBanner = (config.get('electrum.banner') || '').replace(/\\n/g, '\n')
 var serverDonationAddress = config.get('electrum.donationAddress') || ''
 
 
@@ -46,8 +46,7 @@ Electrum.prototype.initialize = function() {
 
   self._isInialized = true
 
-  self.blockchain.on('newHeight', function() {
-    var newHeight = self.blockchain.getBlockCount() - 1
+  self.blockchain.on('newHeight', function(newHeight) {
     var numblocksObj = { id: null, method: 'blockchain.numblocks.subscribe', params: [newHeight] }
     Object.keys(self.subscribers.numblocks).forEach(function(clientId) {
       self.subscribers.numblocks[clientId].send(numblocksObj)

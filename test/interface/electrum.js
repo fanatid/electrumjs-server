@@ -1,22 +1,21 @@
 var expect = require('chai').expect
 var _ = require('lodash')
 
-var config = require('./config.json')
-var fixtures = require('./fixtures/electrum.json')[config.electrum.network]
+var fixtures = require('../fixtures/electrum.json')
 
 
 /**
  * @param {Object} transport
  */
-function electrumTests(data) {
+function runElectrumTests(data) {
   var transport
 
   beforeEach(function() {
     transport = data.transport
   })
 
-  Object.keys(fixtures).forEach(function(method) {
-    fixtures[method].forEach(function(fixture) {
+  Object.keys(fixtures[data.network]).forEach(function(method) {
+    fixtures[data.network][method].forEach(function(fixture) {
       it(method, function(done) {
         transport.request(method, fixture.params, function(response) {
           var exceptMethods = [
@@ -39,4 +38,6 @@ function electrumTests(data) {
 }
 
 
-module.exports = electrumTests
+module.exports = {
+  runElectrumTests: runElectrumTests
+}

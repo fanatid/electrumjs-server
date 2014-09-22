@@ -266,7 +266,7 @@ Blockchain.prototype.catchUp = function() {
 
           }
 
-          self.emit('newHeight')
+          self.emit('newHeight', fullBlock.height)
         }
 
         if (!sigintReceived)

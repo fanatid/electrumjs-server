@@ -1,12 +1,8 @@
-var dns = require('dns')
 var events = require('events')
 var net = require('net')
 var util = require('util')
 
 var expect = require('chai').expect
-
-var config = require('./config.json')
-var electrumTest = require('./electrum')
 
 
 function TCPTransport(host, port) {
@@ -66,26 +62,6 @@ TCPTransport.prototype.request = function(method, params, cb) {
 }
 
 
-describe('tcp transport', function() {
-  var params = {}
-
-  beforeEach(function(done) {
-    dns.resolve(config.electrum.tcp.host, function(error, addresses) {
-      var isResolved = (error === null && addresses.length > 0)
-      expect(isResolved).to.be.true
-
-      params.transport = new TCPTransport(addresses[0], config.electrum.tcp.port)
-      params.transport.once('ready', done)
-    })
-  })
-
-  afterEach(function(done) {
-    params.transport.on('close', function(had_error) {
-      expect(had_error).to.be.false
-      done()
-    })
-    params.transport.end()
-  })
-
-  electrumTest(params)
-})
+module.exports = {
+  TCPTransport: TCPTransport
+}

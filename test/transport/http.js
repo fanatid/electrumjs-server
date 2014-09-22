@@ -6,9 +6,6 @@ var expect = require('chai').expect
 var _ = require('lodash')
 var request = require('request')
 
-var config = require('./config.json')
-var electrumTest = require('./electrum')
-
 
 function HTTPTransport(host, port) {
   var self = this
@@ -87,21 +84,6 @@ HTTPTransport.prototype.request = function(method, params, cb) {
 }
 
 
-describe('http (electrum) transport', function() {
-  var params = {}
-
-  beforeEach(function(done) {
-    params.transport = new HTTPTransport(config.electrum.http.host, config.electrum.http.port)
-    params.transport.once('ready', done)
-  })
-
-  afterEach(function(done) {
-    params.transport.on('close', function(had_error) {
-      expect(had_error).to.be.false
-      done()
-    })
-    params.transport.end()
-  })
-
-  electrumTest(params)
-})
+module.exports = {
+  HTTPTransport: HTTPTransport
+}
