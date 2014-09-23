@@ -1,6 +1,7 @@
 var net = require('net')
 var inherits = require('util').inherits
 
+var _ = require('lodash')
 var Q = require('q')
 
 var Client = require('./client')
@@ -18,6 +19,7 @@ function TCPClient(socket) {
   var self = this
 
   self.isActive = true
+  self.clientId = ['a', socket.remoteAddress, 'p', socket.remotePort].join('')
   self.socket = socket
 
   var message = ''
@@ -63,11 +65,15 @@ TCPClient.prototype.handleRawRequest = function(rawRequest) {
   if (!this.isActive)
     return
 
+  var request
   try {
-    this.emit('request', JSON.parse(rawRequest))
+    request = JSON.parse(rawRequest)
   } catch (error) {
     this.send({ error: 'bad JSON' })
   }
+
+  if (!_.isUndefined(request))
+    this.emit('request', request)
 }
 
 
@@ -102,9 +108,12 @@ TCPTransport.prototype.initialize = function() {
   var deferred = Q.defer()
   var server = net.createServer()
 
+  server.on('connection', function(socket) {
+    self.interface.newClient(new TCPClient(socket))
+  })
+
   server.on('listening', deferred.resolve)
   server.on('error', deferred.reject)
-  server.on('connection', function(socket) { self.interface.newClient(new TCPClient(socket)) })
   server.listen(self.port, self.host)
 
   return deferred.promise.then(function() {

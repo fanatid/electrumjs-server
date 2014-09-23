@@ -12,6 +12,15 @@ var electrumVersion = require('../version').interface.electrum
 function getRealName() {
   var realName = config.get('electrum.irc.reportHost') + ' v' + electrumVersion + ' '
 
+  /**
+   * Todo: check python implementation and add ws and wss
+   * tcp   -- t, 50001
+   * ssl   -- s, 50002
+   * http  -- h, 8081
+   * https -- g, 8082
+   * ws    -- w, 8783
+   * wss   -- v, 8866
+   */
   function addPort(letter, number) {
     if ({'t':'50001', 's':'50002', 'h':'8081', 'g':'8082'}[letter] === number)
       realName += letter + ' '
@@ -23,15 +32,6 @@ function getRealName() {
     switch (transport.type) {
       case 'tcp':
         addPort('t', transport.port)
-        break
-      case 'tcpSSL':
-        addPort('s', transport.port)
-        break
-      case 'http':
-        addPort('h', transport.port)
-        break
-      case 'httpSSL':
-        addPort('g', transport.port)
         break
       default:
         break

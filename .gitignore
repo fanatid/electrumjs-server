@@ -1,4 +1,4 @@
 node_modules
 
-test/config.json
-config.yml
+test/config.yml
+/config.yml

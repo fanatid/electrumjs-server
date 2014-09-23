@@ -2,8 +2,6 @@ var events = require('events')
 var net = require('net')
 var util = require('util')
 
-var expect = require('chai').expect
-
 
 function TCPTransport(host, port) {
   events.EventEmitter.call(this)
@@ -38,10 +36,6 @@ TCPTransport.prototype.end = function() {
   this.socket.end('quit\n')
 }
 
-TCPTransport.prototype.rawRequest = function(rawRequest) {
-  this.socket.write(rawRequest + '\n')
-}
-
 TCPTransport.prototype.request = function(method, params, cb) {
   var requestId = this.nextRequestId++
   var data = {
@@ -49,7 +43,7 @@ TCPTransport.prototype.request = function(method, params, cb) {
     'method': method,
     'params': params
   }
-  this.rawRequest(JSON.stringify(data))
+  this.socket.write(JSON.stringify(data) + '\n')
 
   var responseEvent = function(response) {
     if (response.id === requestId) {

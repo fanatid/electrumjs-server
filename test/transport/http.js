@@ -1,8 +1,6 @@
 var events = require('events')
 var util = require('util')
 
-var expect = require('chai').expect
-
 var _ = require('lodash')
 var request = require('request')
 

@@ -6,20 +6,9 @@ var _ = require('lodash')
 var runElectrumTests = require('./interface/electrum').runElectrumTests
 var TCPTransport = require('./transport/tcp').TCPTransport
 var HTTPTransport = require('./transport/http').HTTPTransport
+var WSTransport = require('./transport/ws').WSTransport
 
-var config = {
-  network: 'bitcoin',
-  electrum: {
-    tcp: {
-      host: 'ecdsa.net',
-      port: 50001
-    },
-    http: {
-      host: 'electrum.thwg.org',
-      port: 8081
-    }
-  }
-}
+var config = require('./config.yml')
 
 
 describe('Electrum interface', function() {
@@ -38,7 +27,7 @@ describe('Electrum interface', function() {
     })
 
     afterEach(function(done) {
-      params.transport.on('close', function(had_error) {
+      params.transport.once('close', function(had_error) {
         expect(had_error).to.be.false
         done()
       })
@@ -56,7 +45,25 @@ describe('Electrum interface', function() {
     })
 
     afterEach(function(done) {
-      params.transport.on('close', function(had_error) {
+      params.transport.once('close', function(had_error) {
+        expect(had_error).to.be.false
+        done()
+      })
+      params.transport.end()
+    })
+
+    runElectrumTests(params)
+  })
+
+  if (!_.isUndefined(config.electrum.ws))
+  describe('WebSocket transport', function() {
+    beforeEach(function(done) {
+      params.transport = new WSTransport(config.electrum.ws.host, config.electrum.ws.port)
+      params.transport.once('ready', done)
+    })
+
+    afterEach(function(done) {
+      params.transport.once('close', function(had_error) {
         expect(had_error).to.be.false
         done()
       })

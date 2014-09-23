@@ -7,6 +7,7 @@ var Q = require('q')
 var Interface = require('./interface')
 var ElectrumIRCClient = require('../peers/electrum')
 var TCPTransport = require('../transport/tcp')
+var WSTransport = require('../transport/ws')
 var util = require('../util')
 
 var electrumVersion = require('../version').interface.electrum
@@ -80,6 +81,9 @@ Electrum.prototype.initialize = function() {
     switch (transport.type) {
       case 'tcp':
         return new TCPTransport(self, transport.port, transport.host).initialize()
+
+      case 'ws':
+        return new WSTransport(self, transport.port, transport.host).initialize()
 
       default:
         throw new Error('Unknow transport: ', transport)
