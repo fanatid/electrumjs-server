@@ -177,17 +177,17 @@ MongoStorage.prototype.setUnspent = function(cTxId, cIndex) {
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-MongoStorage.prototype.getAddress = function(cTxId, cIndex) {
+MongoStorage.prototype.getAddresses = function(cTxId, cIndex) {
   var query = {
     cTxId: new Buffer(cTxId, 'hex'),
     cIndex: cIndex
   }
 
-  return Q.ninvoke(this.history, 'findOne', query).then(function(doc) {
-    if (doc === null)
+  return Q.ninvoke(this.history.find(query), 'toArray').then(function(rows) {
+    if (rows.length === 0)
       return null
 
-    return base58check.encode(doc.address.buffer)
+    return rows.map(function(row) { return base58check.encode(row.address.buffer) })
   })
 }
 

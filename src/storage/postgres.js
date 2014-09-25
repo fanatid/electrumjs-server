@@ -214,7 +214,7 @@ PostgresStorage.prototype.setUnspent = function(cTxId, cIndex) {
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.getAddress = function(cTxId, cIndex) {
+PostgresStorage.prototype.getAddresses = function(cTxId, cIndex) {
   var sql = 'SELECT address FROM history WHERE cTxId = $1 AND cIndex = $2'
   var params = [new Buffer(cTxId, 'hex'), cIndex]
 
@@ -222,7 +222,7 @@ PostgresStorage.prototype.getAddress = function(cTxId, cIndex) {
     if (result.rowCount === 0)
       return null
 
-    return base58check.encode(result.rows[0].address)
+    return result.rows.map(function(row) { return base58check.encode(row.address) })
   })
 }
 

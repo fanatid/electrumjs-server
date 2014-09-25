@@ -201,7 +201,9 @@ Electrum.prototype.newRequest = function(client, request) {
           break
 
         case 'blockchain.utxo.get_address':
-          result = yield self.blockchain.getAddress(params[0], parseInt(params[1]))
+          result = yield self.blockchain.getAddresses(params[0], parseInt(params[1]))
+          if (result !== null)
+            result = result[0]
           break
 
         case 'blockchain.block.get_header':

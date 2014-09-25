@@ -71,7 +71,7 @@ Storage.prototype.setUnspent = function() {}
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-Storage.prototype.getAddress = function() {}
+Storage.prototype.getAddresses = function() {}
 
 /**
  * @abstract

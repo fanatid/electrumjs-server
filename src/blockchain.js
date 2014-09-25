@@ -60,7 +60,7 @@ Blockchain.prototype.initialize = function() {
       self.bitcoind = Q.nbind(self.bitcoindClient.cmd, self.bitcoindClient)
 
       var bitcoindInfo = (yield self.bitcoind('getinfo'))[0]
-      if (config.get('server.network') === 'testnet' && !bitcoindInfo.testnet)
+      if ((config.get('server.network') === 'testnet') !== bitcoindInfo.testnet)
         throw new Error('bitcoind and ewallet-server have different networks')
 
       /** create storage */
@@ -76,7 +76,7 @@ Blockchain.prototype.initialize = function() {
           break
 
         case 'redis':
-          throw new Error('Redis not supported now... (not with parallel transactions import)')
+          throw new Error('Redis not supported now...')
           var RedisStorage = require('./storage/redis')
           self.storage = new RedisStorage()
           break
@@ -375,7 +375,7 @@ Blockchain.prototype.updateMempool = function() {
    * mempool structure
    *  txIds: {txId: true}
    *  spent: {cTxId: {cIndex: sTxId}}
-   *  addrs: {sTxId+sIndex: address}
+   *  addrs: {sTxId+sIndex: addresses}
    *  coins: {address: {cTxId: {cIndex: cValue}}}
    */
 
@@ -412,10 +412,10 @@ Blockchain.prototype.updateMempool = function() {
         })
 
         tx.outs.forEach(function(output, outIndex) {
-          util.getAddressesFromOutputScript(output.script, self.network).forEach(function(address) {
-            // Todo: may have more than 1 address (multisig)
-            self.mempool.addrs[txId + outIndex] = address
+          var addresses = util.getAddressesFromOutputScript(output.script, self.network)
 
+          self.mempool.addrs[txId + outIndex] = addresses
+          addresses.forEach(function(address) {
             self.mempool.coins[address] = self.mempool.coins[address] || {}
             self.mempool.coins[address][txId] = self.mempool.coins[address][txId] || {}
             self.mempool.coins[address][txId][outIndex] = output.value
@@ -433,13 +433,13 @@ Blockchain.prototype.updateMempool = function() {
 
         stat.touchedAddress.remove(addr)
         if (!_.isUndefined(self.mempool.addrs[addr])) {
-          stat.touchedAddress.add(self.mempool.addrs[addr])
+          self.mempool.addrs[addr].forEach(function(value) { stat.touchedAddress.add(value) })
           return
         }
 
-        promises.push(self.storage.getAddress(items[0], parseInt(items[1])).then(function(addr) {
-          if (addr !== null)
-            stat.touchedAddress.add(addr)
+        promises.push(self.storage.getAddresses(items[0], parseInt(items[1])).then(function(addrs) {
+          if (addrs !== null)
+            addrs.forEach(function(addr) { stat.touchedAddress.add(addr) })
         }))
       })
       Q.all(promises).then(function() {
@@ -482,11 +482,11 @@ Blockchain.prototype.mainIteration = function() {
  * @param {number} outIndex
  * @return {Q.Promise}
  */
-Blockchain.prototype.getAddress = function(txId, outIndex) {
+Blockchain.prototype.getAddresses = function(txId, outIndex) {
   if (!_.isUndefined(this.mempool.addrs[txId + outIndex]))
     return Q(this.mempool.addrs[txId + outIndex])
 
-  return this.storage.getAddress(txId, outIndex)
+  return this.storage.getAddresses(txId, outIndex)
 }
 
 /**
@@ -507,7 +507,7 @@ Blockchain.prototype.getCoins = function(address) {
           cValue: mempoolCoins[cTxId][cIndex],
           cHeight: 0,
           sTxId: null,
-          sHeight: 0
+          sHeight: null
         })
       })
     })
