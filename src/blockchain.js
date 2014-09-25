@@ -13,44 +13,6 @@ var util = require('./util')
 
 
 /**
- * @param {bitcoin.Client} bitcoinClient
- * @param {string} blockHash
- * @return {Q.Promise}
- */
-function getFullBlock(bitcoinClient, blockHash) {
-  return Q.ninvoke(bitcoinClient, 'cmd', 'getblock', blockHash).spread(function(block) {
-    if (block.height === 0) {
-      block.tx = []
-      block.previousblockhash = '0000000000000000000000000000000000000000000000000000000000000000'
-      return block
-    }
-
-    return Q.Promise(function(resolve, reject) {
-      var batch = block.tx.map(function(txId) {
-        return { method: 'getrawtransaction', params: [txId] }
-      })
-
-      var resultTx = []
-      function callback(error, rawTx) {
-        if (error) {
-          reject(error)
-          return
-        }
-
-        resultTx.push(bitcoin.Transaction.fromHex(rawTx))
-        if (resultTx.length === batch.length) {
-          block.tx = resultTx
-          resolve(block)
-        }
-      }
-
-      bitcoinClient.cmd(batch, callback)
-    })
-  })
-}
-
-
-/**
  * @event Blockchain#newHeight
  */
 
@@ -205,6 +167,7 @@ Blockchain.prototype.getHeader = function(index) {
   var header = chunk.slice((index % 2016)*160, (index % 2016 + 1)*160)
   if (header.length === 0)
     throw new RangeError('Header not exists')
+
   return header
 }
 
@@ -256,12 +219,12 @@ Blockchain.prototype.catchUp = function() {
             break
 
           blockHash = (yield self.bitcoind('getblockhash', self.getBlockCount()))[0]
-          var fullBlock = yield getFullBlock(self.bitcoindClient, blockHash)
+          var fullBlock = yield util.getFullBlock(self.bitcoindClient, blockHash)
           if (self.lastBlockHash === fullBlock.previousblockhash) {
             yield self.importBlock(fullBlock)
 
           } else {
-            fullBlock = yield getFullBlock(self.bitcoindClient, self.lastBlockHash)
+            fullBlock = yield util.getFullBlock(self.bitcoindClient, self.lastBlockHash)
             yield self.importBlock(fullBlock, true)
 
           }
@@ -310,11 +273,9 @@ Blockchain.prototype.importBlock = function(block, revert) {
         var hexHeader = util.block2rawHeader(block).toString('hex')
         yield self.storage.pushHeader(hexHeader, block.height)
         self.pushHeader(hexHeader)
-
       } else {
         yield self.storage.popHeader()
         self.popHeader()
-
       }
 
       self.updateLastBlockHash()
@@ -380,11 +341,9 @@ Blockchain.prototype.importTransactions = function(transactions, isImport) {
 
           for (outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
             var output = tx.outs[outIndex]
-            var address = bitcoin.Address.fromOutputScript(output.script, self.network)
-            if (address === null)
-              continue
-
-            yield self.storage.addCoin(address, txId, outIndex, output.value, currentHeight)
+            var addresses = util.getAddressesFromOutputScript(output.script, self.network)
+            for (var addressId = 0; addressId < addresses.length; ++addressId)
+              yield self.storage.addCoin(addresses[addressId], txId, outIndex, output.value, currentHeight)
           }
         } else {
           for (outIndex = 0; outIndex < tx.outs.length; ++outIndex)

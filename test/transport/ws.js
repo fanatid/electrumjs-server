@@ -11,7 +11,7 @@ function WSTransport(host, port) {
   self.nextRequestId = 0
 
   var wsURL = ['http://', host, ':', port].join('')
-  self.socket = socket(wsURL, { 'force new connection': true })
+  self.socket = socket(wsURL, { forceNew: true })
   self.socket.on('connect', function() {
     self.emit('ready')
   })

@@ -1,33 +1,9 @@
 var assert = require('assert')
 
 var bitcoin = require('bitcoinjs-lib')
-var Address = bitcoin.Address
-var ECPubKey = bitcoin.ECPubKey
 var bufferutils = bitcoin.bufferutils
-var scripts = bitcoin.scripts
 var opcodes = bitcoin.opcodes
 
-
-/**
- * Extract from obsolete pay-to-pubkey transaction
- *
- * I try added to bitcoinjs-lib, but got circular require:
- *  https://github.com/bitcoinjs/bitcoinjs-lib/pull/273
- */
-bitcoin.Address.fromOutputScript = function(script, network) {
-  var scriptType = scripts.classifyOutput(script)
-
-  if (scriptType === 'pubkeyhash')
-    return new Address(script.chunks[2], network.pubKeyHash).toBase58Check()
-
-  if (scriptType === 'scripthash')
-    return new Address(script.chunks[1], network.scriptHash).toBase58Check()
-
-  if (scriptType === 'pubkey')
-    return ECPubKey.fromBuffer(script.chunks[0]).getAddress(network).toBase58Check()
-    
-  return null
-}
 
 /**
  * @param {Buffer} buffer

@@ -1,45 +1,11 @@
 var crypto = require('crypto')
 
+var bitcoin = require('bitcoinjs-lib')
+var Address = bitcoin.Address
+var ECPubKey = bitcoin.ECPubKey
 var _ = require('lodash')
+var Q = require('q')
 
-
-/**
- * @param {bitcoinjs-lib.Transaction[]}
- * @param {bitcoinjs-lib.Transaction[][]}
- */
-function groupTransactions(transactions) {
-  var transactionsIds = _.zipObject(transactions.map(function(tx) { return [tx.getId(), tx] }))
-  var resultIds = {}
-  var result = []
-
-  function sort(tx, topTx, level) {
-    if (!_.isUndefined(resultIds[tx.getId()]))
-      return
-
-    tx.ins.forEach(function(input) {
-      var inputId = Array.prototype.reverse.call(new Buffer(input.hash)).toString('hex')
-      if (_.isUndefined(transactionsIds[inputId]))
-        return
-
-      if (transactionsIds[inputId].getId() === topTx.getId())
-        throw new Error('graph is cyclical')
-
-      sort(transactionsIds[inputId], tx, level+1)
-    })
-
-    resultIds[tx.getId()] = true
-    result[result.length - 1].push(tx)
-    if (level === 0 && result.length > 1)
-      result[result.length - 1].reverse()
-  }
-
-  transactions.forEach(function(tx) {
-    result.push([])
-    sort(tx, tx, 0)
-  })
-
-  return result
-}
 
 /**
  * @param {number[]} prevTime
@@ -49,6 +15,7 @@ function spendTime(prevTime) {
   var tm = process.hrtime(prevTime)
   return tm[0]*1000 + tm[1]/1000000
 }
+
 
 /**
  * @param {Buffer} data
@@ -92,6 +59,44 @@ function hashDecode(s) {
  */
 function revHex(s) {
   return hashDecode(s).toString('hex')
+}
+
+
+/**
+ * @param {bitcoin.Client} bitcoinClient
+ * @param {string} blockHash
+ * @return {Q.Promise}
+ */
+function getFullBlock(bitcoinClient, blockHash) {
+  return Q.ninvoke(bitcoinClient, 'cmd', 'getblock', blockHash).spread(function(block) {
+    if (block.height === 0) {
+      block.tx = []
+      block.previousblockhash = '0000000000000000000000000000000000000000000000000000000000000000'
+      return block
+    }
+
+    return Q.Promise(function(resolve, reject) {
+      var batch = block.tx.map(function(txId) {
+        return { method: 'getrawtransaction', params: [txId] }
+      })
+
+      var resultTx = []
+      function callback(error, rawTx) {
+        if (error) {
+          reject(error)
+          return
+        }
+
+        resultTx.push(bitcoin.Transaction.fromHex(rawTx))
+        if (resultTx.length === batch.length) {
+          block.tx = resultTx
+          resolve(block)
+        }
+      }
+
+      bitcoinClient.cmd(batch, callback)
+    })
+  })
 }
 
 /**
@@ -142,10 +147,84 @@ function rawHeader2block(rawHeader) {
 }
 
 
+/**
+ * @param {bitcoinjs-lib.Transaction[]}
+ * @param {bitcoinjs-lib.Transaction[][]}
+ */
+function groupTransactions(transactions) {
+  var transactionsIds = _.zipObject(transactions.map(function(tx) { return [tx.getId(), tx] }))
+  var resultIds = {}
+  var result = []
+
+  function sort(tx, topTx, level) {
+    if (!_.isUndefined(resultIds[tx.getId()]))
+      return
+
+    tx.ins.forEach(function(input) {
+      var inputId = Array.prototype.reverse.call(new Buffer(input.hash)).toString('hex')
+      if (_.isUndefined(transactionsIds[inputId]))
+        return
+
+      if (transactionsIds[inputId].getId() === topTx.getId())
+        throw new Error('graph is cyclical')
+
+      sort(transactionsIds[inputId], tx, level+1)
+    })
+
+    resultIds[tx.getId()] = true
+    result[result.length - 1].push(tx)
+    if (level === 0 && result.length > 1)
+      result[result.length - 1].reverse()
+  }
+
+  transactions.forEach(function(tx) {
+    result.push([])
+    sort(tx, tx, 0)
+  })
+
+  return result
+}
+
+
+/**
+ * @param {bitcoinjs-lib.Script} script
+ * @param {Object} network
+ * @param {number} network.pubKeyHash
+ * @param {number} network.scriptHash
+ * @return {string[]}
+ */
+function getAddressesFromOutputScript(script, network) {
+  var addresses = []
+
+  switch (bitcoin.scripts.classifyOutput(script)) {
+    case 'pubkeyhash':
+      addresses = [new Address(script.chunks[2], network.pubKeyHash)]
+      break
+
+    case 'pubkey':
+      addresses = [ECPubKey.fromBuffer(script.chunks[0]).getAddress(network)]
+      break
+
+    case 'multisig':
+      addresses = script.chunks.slice(1, -2).map(function(pubKey) {
+        return ECPubKey.fromBuffer(pubKey).getAddress(network)
+      })
+      break
+
+    case 'scripthash':
+      addresses = [new Address(script.chunks[1], network.scriptHash)]
+      break
+
+    default:
+      break
+  }
+
+  return addresses.map(function(addr) { return addr.toBase58Check() })
+}
+
+
 module.exports = {
   Set: require('set'),
-
-  groupTransactions: groupTransactions,
   spendTime: spendTime,
 
   sha256: sha256,
@@ -153,6 +232,11 @@ module.exports = {
   hashEncode: hashEncode,
   hashDecode: hashDecode,
 
+  getFullBlock: getFullBlock,
   block2rawHeader: block2rawHeader,
-  rawHeader2block: rawHeader2block
+  rawHeader2block: rawHeader2block,
+
+  groupTransactions: groupTransactions,
+
+  getAddressesFromOutputScript: getAddressesFromOutputScript
 }

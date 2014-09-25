@@ -6,3 +6,6 @@ electrum:
   http:
     host: electrum.thwg.org
     port: 8081
+  ws:
+    host: localhost
+    port: 8783
