@@ -11,13 +11,13 @@ Features
   * Required bitcoind
   * Supported networks: bitcoin, testnet, litecoin, litecoin-testnet
   * Supported storage: MongoDB, PostgreSQL
-  * Supported transports: TCP, WebSocket
+  * Supported transports: TCP, HTTP, WebSocket
 
 Todo
 ----
 
   * SSL
-  * HTTP/HTTPS
+  * HTTPS
   * Enhanced HTTP session (in json instead cookie)
   * WebSocket secure
 

@@ -1,11 +1,11 @@
 network: bitcoin
 electrum:
-  tcp:
-    host: ecdsa.net
-    port: 50001
   http:
     host: electrum.thwg.org
     port: 8081
+  tcp:
+    host: ecdsa.net
+    port: 50001
   ws:
     host: localhost
     port: 8783

@@ -47,7 +47,7 @@ function WSClient(socket) {
 inherits(WSClient, Client)
 
 /**
- * @param {Object} response
+ * @param {Object} data
  */
 WSClient.prototype.send = function(data) {
   if (this.isActive)
@@ -72,6 +72,9 @@ function WSTransport(interface, port, host) {
 
   this.http = http.createServer()
   this.io = socket(this.http, { serveClient: false })
+  this.io.sockets.on('connection', function(socket) {
+    this.interface.newClient(new WSClient(socket))
+  }.bind(this))
 }
 
 inherits(WSTransport, Transport)
@@ -88,16 +91,12 @@ WSTransport.prototype.initialize = function() {
 
   var deferred = Q.defer()
 
-  self.io.sockets.on('connection', function(socket) {
-    self.interface.newClient(new WSClient(socket))
-  })
-
   self.http.on('listening', deferred.resolve)
   self.http.on('error', deferred.reject)
   self.http.listen(self.port, self.host)
 
   return deferred.promise.then(function() {
-    logger.info('Created websocket transport for %s interface, listening on %s:%s',
+    logger.info('Created WebSocket transport for %s interface, listening on %s:%s',
       self.interface.constructor.name, self.host, self.port)
   })
 }

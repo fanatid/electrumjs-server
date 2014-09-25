@@ -92,6 +92,10 @@ function TCPTransport(interface, port, host) {
   this.interface = interface
   this.port = port
   this.host = host
+
+  this.server = net.createServer(function(socket) {
+    this.interface.newClient(new TCPClient(socket))
+  }.bind(this))
 }
 
 inherits(TCPTransport, Transport)
@@ -107,18 +111,13 @@ TCPTransport.prototype.initialize = function() {
   self._isInialized = true
 
   var deferred = Q.defer()
-  var server = net.createServer()
 
-  server.on('connection', function(socket) {
-    self.interface.newClient(new TCPClient(socket))
-  })
-
-  server.on('listening', deferred.resolve)
-  server.on('error', deferred.reject)
-  server.listen(self.port, self.host)
+  self.server.on('listening', deferred.resolve)
+  self.server.on('error', deferred.reject)
+  self.server.listen(self.port, self.host)
 
   return deferred.promise.then(function() {
-    logger.info('Created tcp transport for %s interface, listening on %s:%s',
+    logger.info('Created TCP transport for %s interface, listening on %s:%s',
       self.interface.constructor.name, self.host, self.port)
   })
 }

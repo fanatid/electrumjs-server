@@ -11,7 +11,7 @@ var logger = new winston.Logger({
     }),
   ]
 })
-logger.transports.console.level = config.get('server.loggerLevel') || 'info'
+logger.transports.console.level = config.get('server.loggerLevel')
 
 
 module.exports.logger = logger

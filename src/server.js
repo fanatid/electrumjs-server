@@ -25,14 +25,20 @@ Q.spawn(function* () {
     var blockchain = new Blockchain()
     yield blockchain.initialize()
 
-    var interfaces = []
-    if (config.get('server.interface').indexOf('electrum') !== -1)
-      interfaces.push(new Electrum(blockchain))
+    var promises = config.get('server.interface').map(function(configInterface) {
+      switch (configInterface) {
+        case 'electrum':
+          return new Electrum(blockchain).initialize()
 
-    if (interfaces.length === 0)
+        default:
+          throw new Error('Unknow interface')
+      }
+    })
+
+    if (promises.length === 0)
       throw new Error('Interfaces not found')
 
-    yield Q.all(interfaces.map(function(obj) { return obj.initialize() }))
+    yield Q.all(promises)
     logger.info('Server ready')
 
   } catch (error) {

@@ -7,6 +7,7 @@ var Q = require('q')
 var Interface = require('./interface')
 var logger = require('../logger').logger
 var ElectrumIRCClient = require('../peers/electrum')
+var http = require('../transport/http')
 var tcp = require('../transport/tcp')
 var ws = require('../transport/ws')
 var util = require('../util')
@@ -80,6 +81,9 @@ Electrum.prototype.initialize = function() {
 
   var promises = config.get('electrum.transport').map(function(transport) {
     switch (transport.type) {
+      case 'http':
+        return new http.HTTPTransport(self, transport.port, transport.host).initialize()
+
       case 'tcp':
         return new tcp.TCPTransport(self, transport.port, transport.host).initialize()
 

@@ -20,6 +20,10 @@ electrum:
     reportHost: <yourhostname>
   transport:
     -
+      type: http
+      host: localhost
+      port: 8081
+    -
       type: tcp
       host: localhost
       port: 50001
