@@ -6,6 +6,7 @@ var _ = require('lodash')
 var Q = require('q')
 
 var Client = require('./client')
+var logger = require('../logger').logger
 var Transport = require('./transport')
 
 
@@ -96,15 +97,12 @@ WSTransport.prototype.initialize = function() {
   self.http.listen(self.port, self.host)
 
   return deferred.promise.then(function() {
-    var msg = [
-      'Created websocket transport for ',
-      self.interface.constructor.name,
-      ' interface, listening on ',
-      self.host + ':' + self.port
-    ].join('')
-    console.log(msg)
+    logger.info('Created websocket transport for %s interface, listening on %s:%s',
+      self.interface.constructor.name, self.host, self.port)
   })
 }
 
 
-module.exports = WSTransport
+module.exports = {
+  WSTransport: WSTransport
+}

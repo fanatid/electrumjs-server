@@ -6,6 +6,8 @@ var _ = require('lodash')
 var MongoClient = require('mongodb').MongoClient
 var Q = require('q')
 
+var logger = require('../logger').logger
+
 var Storage = require('./storage')
 var storageVersion = require('../version').storage.mongo
 
@@ -61,7 +63,7 @@ MongoStorage.prototype.initialize = function() {
       yield Q.ninvoke(self.history, 'ensureIndex', 'sHeight')
 
       /** done */
-      console.log('Storage (MongoDB) created')
+      logger.info('Storage (MongoDB) ready')
       deferred.resolve()
 
     } catch (error) {

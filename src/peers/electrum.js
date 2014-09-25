@@ -7,6 +7,7 @@ var Q = require('q')
 
 var IRCClient = require('./ircclient')
 var electrumVersion = require('../version').interface.electrum
+var logger = require('../logger').logger
 
 
 function getRealName() {
@@ -114,7 +115,7 @@ ElectrumIRCClient.prototype.initialize = function() {
   self.client.connect()
 
   self.client.on('registered', function() {
-    console.log('Electrum IRC connected')
+    logger.info('Electrum IRC connected')
     deferred.resolve()
   })
 
@@ -145,7 +146,7 @@ ElectrumIRCClient.prototype.initialize = function() {
     var items = (message.args[7] || '').split(' ')
     dns.resolve(items[1], function(error, addresses) {
       if (error || addresses.length === 0) {
-        console.error('dns.resolve error: ', error, '(addresses: ' + addresses + ')')
+        logger.warn('dns.resolve address: %s | %s', addresses.toString(), error.stack)
         return
       }
 
@@ -159,7 +160,7 @@ ElectrumIRCClient.prototype.initialize = function() {
   })
 
   self.client.on('error', function(error) {
-    console.error('ElectrumIRC error:', error)
+    logger.error('ElectrumIRC error: %s', error.stack)
     deferred.reject(error)
   })
 

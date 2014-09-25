@@ -5,9 +5,10 @@ var _ = require('lodash')
 var Q = require('q')
 
 var Interface = require('./interface')
+var logger = require('../logger').logger
 var ElectrumIRCClient = require('../peers/electrum')
-var TCPTransport = require('../transport/tcp')
-var WSTransport = require('../transport/ws')
+var tcp = require('../transport/tcp')
+var ws = require('../transport/ws')
 var util = require('../util')
 
 var electrumVersion = require('../version').interface.electrum
@@ -72,7 +73,7 @@ Electrum.prototype.initialize = function() {
       })
 
     }).catch(function(error) {
-      console.error(error)
+      logger.error('Electrum.getAddressStatus error: %s', error.stack)
 
     })
   })
@@ -80,10 +81,10 @@ Electrum.prototype.initialize = function() {
   var promises = config.get('electrum.transport').map(function(transport) {
     switch (transport.type) {
       case 'tcp':
-        return new TCPTransport(self, transport.port, transport.host).initialize()
+        return new tcp.TCPTransport(self, transport.port, transport.host).initialize()
 
       case 'ws':
-        return new WSTransport(self, transport.port, transport.host).initialize()
+        return new ws.WSTransport(self, transport.port, transport.host).initialize()
 
       default:
         throw new Error('Unknow transport: ', transport)
@@ -104,7 +105,9 @@ Electrum.prototype.initialize = function() {
     promises.push(ircPromise)
   }
 
-  return Q.all(promises).then(function() { console.log('Electrum interface created') })
+  return Q.all(promises).then(function() {
+    logger.info('Electrum interface ready')
+  })
 }
 
 /**
@@ -251,7 +254,9 @@ Electrum.prototype.newRequest = function(client, request) {
       client.send({ id: requestId, result: result })
 
     } catch (error) {
-      console.error(error)
+      logger.error('Electrum.newRequest error: %s\nraw request: %s',
+        error.stack, JSON.stringify(request))
+
       client.send({ id: requestId, error: error.message })
 
     }

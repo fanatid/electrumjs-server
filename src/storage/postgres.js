@@ -6,6 +6,8 @@ var _ = require('lodash')
 var pg = require('pg')
 var Q = require('q')
 
+var logger = require('../logger').logger
+
 var Storage = require('./storage')
 var storageVersion = require('../version').storage.postgres
 
@@ -111,7 +113,7 @@ PostgresStorage.prototype.initialize = function() {
         throw new Error('Server network is ' + serverNetwork + ', whereas db network is ' + dbNetwork)
 
       /** done */
-      console.log('Storage (PostgreSQL) created')
+      logger.info('Storage (PostgreSQL) ready')
       deferred.resolve()
 
     } catch (error) {

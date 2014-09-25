@@ -8,6 +8,7 @@ var bufferEqual = require('buffer-equal')
 var _ = require('lodash')
 var Q = require('q')
 
+var logger = require('./logger').logger
 var networks = require('./networks')
 var util = require('./util')
 
@@ -88,6 +89,7 @@ Blockchain.prototype.initialize = function() {
       /** load headers and set last block hash */
       self.chunksCache = []
 
+      logger.verbose('Loading headers from storage...')
       var headers = yield self.storage.getAllHeaders()
       headers.forEach(self.pushHeader.bind(self))
 
@@ -98,13 +100,13 @@ Blockchain.prototype.initialize = function() {
       /** catch up new blocks and get info from mempool */
       self.mempool = { txIds: {}, spent: {}, addrs: {}, coins: {} }
       self.on('newHeight', function() {
-        console.log('clear mempool')
+        logger.verbose('clear mempool')
         self.mempool = { txIds: {}, spent: {}, addrs: {}, coins: {} }
       })
       process.nextTick(self.mainIteration.bind(self))
 
       /** done */
-      console.log('Blockchain ready, current height: ', self.getBlockCount() - 1)
+      logger.info('Blockchain ready, current height: %s', self.getBlockCount() - 1)
       deferred.resolve()
 
     } catch (error) {
@@ -208,7 +210,7 @@ Blockchain.prototype.catchUp = function() {
   return Q.Promise(function(resolve, reject) {
     Q.spawn(function* () {
       var sigintReceived = false
-      function onSIGINT() { sigintReceived = true; console.log('SIGINT received, please wait...') }
+      function onSIGINT() { sigintReceived = true; logger.warn('SIGINT received, please wait...') }
       process.addListener('SIGINT', onSIGINT)
 
       try {
@@ -294,13 +296,9 @@ Blockchain.prototype.importBlock = function(block, revert) {
       touchedAddress.forEach(function(addr) { self.emit('touchedAddress', addr) })
 
       /** done */
-      var msg = [
-        (revert ? 'revert' : 'import') + ' block #' + block.height,
-        block.tx.length + ' transactions',
-        stat.inputs + '/' + stat.outputs,
-        util.spendTime(stat.st) + 'ms'
-      ]
-      console.log(msg.join(', '))
+      logger.info('%s block #%s, %s transactions, %s/%s, %sms',
+        revert ? 'Revert' : 'Import', block.height, block.tx.length,
+        stat.inputs, stat.outputs, util.spendTime(stat.st))
       deferred.resolve()
 
     } catch (error) {
@@ -414,17 +412,16 @@ Blockchain.prototype.updateMempool = function() {
         })
 
         tx.outs.forEach(function(output, outIndex) {
-          var address = bitcoin.Address.fromOutputScript(output.script, self.network)
-          if (address === null)
-            return
+          util.getAddressesFromOutputScript(output.script, self.network).forEach(function(address) {
+            // Todo: may have more than 1 address (multisig)
+            self.mempool.addrs[txId + outIndex] = address
 
-          self.mempool.addrs[txId + outIndex] = address
+            self.mempool.coins[address] = self.mempool.coins[address] || {}
+            self.mempool.coins[address][txId] = self.mempool.coins[address][txId] || {}
+            self.mempool.coins[address][txId][outIndex] = output.value
 
-          self.mempool.coins[address] = self.mempool.coins[address] || {}
-          self.mempool.coins[address][txId] = self.mempool.coins[address][txId] || {}
-          self.mempool.coins[address][txId][outIndex] = output.value
-
-          stat.touchedAddress.add(address)
+            stat.touchedAddress.add(address)
+          })
         })
       }
 
@@ -449,13 +446,8 @@ Blockchain.prototype.updateMempool = function() {
         stat.touchedAddress.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
       })
 
-      var msg = [
-        'update mempool',
-        '+' + stat.added,
-        'now: ' + Object.keys(self.mempool.txIds).length,
-        util.spendTime(stat.st) + 'ms'
-      ]
-      console.log(msg.join(', '))
+      logger.verbose('Update mempool +%s, now %s, %sms',
+        stat.added, Object.keys(self.mempool.txIds).length, util.spendTime(stat.st))
       deferred.resolve()
 
     } catch(error) {
@@ -477,7 +469,7 @@ Blockchain.prototype.mainIteration = function() {
       yield self.updateMempool()
 
     } catch (error) {
-      console.error(error)
+      logger.error('Blockchain.mainIteration error: %s', error.stack)
 
     }
 

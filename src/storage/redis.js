@@ -6,6 +6,8 @@ var config = require('config')
 var Q = require('q')
 var redis = require('redis')
 
+var logger = require('../logger').logger
+
 var Storage = require('./storage')
 var storageVersion = require('../version').storage.redis
 
@@ -74,7 +76,7 @@ RedisStorage.prototype.initialize = function() {
         throw new Error('Server network is ' + serverNetwork + ', whereas db network is ' + dbNetwork)
 
       /** done */
-      console.log('Storage (Redis) created')
+      logger.info('Storage (Redis) ready')
       deferred.resolve()
 
     } catch (error) {

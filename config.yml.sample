@@ -1,4 +1,5 @@
 server:
+  loggerLevel: info
   network: bitcoin
   storage: postgres
   interface:

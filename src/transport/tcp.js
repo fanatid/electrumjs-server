@@ -5,6 +5,7 @@ var _ = require('lodash')
 var Q = require('q')
 
 var Client = require('./client')
+var logger = require('../logger').logger
 var Transport = require('./transport')
 
 
@@ -117,15 +118,12 @@ TCPTransport.prototype.initialize = function() {
   server.listen(self.port, self.host)
 
   return deferred.promise.then(function() {
-    var msg = [
-      'Created tcp transport for ',
-      self.interface.constructor.name,
-      ' interface, listening on ',
-      self.host + ':' + self.port
-    ].join('')
-    console.log(msg)
+    logger.info('Created tcp transport for %s interface, listening on %s:%s',
+      self.interface.constructor.name, self.host, self.port)
   })
 }
 
 
-module.exports = TCPTransport
+module.exports = {
+  TCPTransport: TCPTransport
+}

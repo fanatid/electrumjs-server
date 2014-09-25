@@ -11,6 +11,7 @@ var config = require('config')
 /** bitcoinjs-lib monkey patching */
 require('./bitcoinjs-lib-patching')
 
+var logger = require('./logger').logger
 
 var Blockchain = require('./blockchain')
 var Electrum = require('./interface/electrum')
@@ -32,10 +33,10 @@ Q.spawn(function* () {
       throw new Error('Interfaces not found')
 
     yield Q.all(interfaces.map(function(obj) { return obj.initialize() }))
-    console.log('Server ready')
+    logger.info('Server ready')
 
   } catch (error) {
-    console.log(error)
+    logger.error(error)
     process.kill(process.pid, 'SIGINT') // wait blockchain
 
   }
