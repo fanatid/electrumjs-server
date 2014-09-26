@@ -60,7 +60,9 @@ Blockchain.prototype.initialize = function() {
       self.bitcoind = Q.nbind(self.bitcoindClient.cmd, self.bitcoindClient)
 
       var bitcoindInfo = (yield self.bitcoind('getinfo'))[0]
-      if ((config.get('server.network') === 'testnet') !== bitcoindInfo.testnet)
+      var configNetwork = config.get('server.network')
+      var configNetworkIsTestnet = configNetwork.indexOf('testnet', configNetwork.length - 7) !== -1
+      if (configNetworkIsTestnet !== bitcoindInfo.testnet)
         throw new Error('bitcoind and ewallet-server have different networks')
 
       /** create storage */
