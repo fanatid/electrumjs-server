@@ -9,33 +9,21 @@ var IRCClient = require('./ircclient')
 var electrumVersion = require('../version').interface.electrum
 var logger = require('../logger').logger
 
+var namesMap = { http: 'h', https: 'g', tcp: 't', ssl: 's', ws: 'w', wss: 'v' }
+var portsMap = { h: 8081, g: 8082, t: 50001, s: 50002, w: 8783, v: 8886 }
+
 
 function getRealName() {
   var realName = config.get('electrum.irc.reportHost') + ' v' + electrumVersion + ' '
 
-  /**
-   * Todo: check python implementation and add ws and wss
-   * tcp   -- t, 50001
-   * ssl   -- s, 50002
-   * http  -- h, 8081
-   * https -- g, 8082
-   * ws    -- w, 8783
-   * wss   -- v, 8866
-   */
-  function addPort(letter, number) {
-    if ({'t':'50001', 's':'50002', 'h':'8081', 'g':'8082'}[letter] === number)
-      realName += letter + ' '
-    else
-      realName += letter + number + ' '
-  }
-
   config.get('electrum.transport').forEach(function(transport) {
-    switch (transport.type) {
-      case 'tcp':
-        addPort('t', transport.port)
-        break
-      default:
-        break
+    var letter = namesMap[transport.type]
+
+    if (!_.isUndefined(letter)) {
+      if (portsMap[letter] === transport.port)
+        realName += letter + ' '
+      else
+        realName += letter + transport.port + ' '
     }
   })
 
