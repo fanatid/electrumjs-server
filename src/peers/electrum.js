@@ -3,6 +3,7 @@ var inherits = require('util').inherits
 
 var config = require('config')
 var irc = require('irc')
+var _ = require('lodash')
 var Q = require('q')
 
 var IRCClient = require('./ircclient')

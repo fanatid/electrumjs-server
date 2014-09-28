@@ -32,7 +32,8 @@ function Electrum(blockchain) {
     numblocks: {},
     headers: {},
     address: {},
-    clientAddresses: {}
+    clientAddresses: {},
+    peers: {}
   }
   this.peers = {}
 }
@@ -50,16 +51,12 @@ Electrum.prototype.initialize = function() {
   self._isInialized = true
 
   self.blockchain.on('newHeight', function(newHeight) {
-    var numblocksObj = { id: null, method: 'blockchain.numblocks.subscribe', params: [newHeight] }
-    Object.keys(self.subscribers.numblocks).forEach(function(clientId) {
-      self.subscribers.numblocks[clientId].send(numblocksObj)
-    })
+    var numblocksMsg = { id: null, method: 'blockchain.numblocks.subscribe', params: [newHeight] }
+    self.broadcastMessage(_.values(self.subscribers.numblocks), numblocksMsg)
 
     var newHeader = self.blockchain.getHeader(newHeight)
-    var headersObj = { id: null, method: 'blockchain.headers.subscribe', params: [newHeader] }
-    Object.keys(self.subscribers.headers).forEach(function(clientId) {
-      self.subscribers.headers[clientId].send(headersObj)
-    })
+    var headersMsg = { id: null, method: 'blockchain.headers.subscribe', params: [newHeader] }
+    self.broadcastMessage(_.values(self.subscribers.headers), headersMsg)
   })
 
   self.blockchain.on('touchedAddress', function(address) {
@@ -67,11 +64,8 @@ Electrum.prototype.initialize = function() {
       return
 
     self.getAddressStatus(address).then(function(status) {
-      var addressObj = { id: null, method: 'blockchain.address.subscribe', params: [address, status] }
-      var clients = self.subscribers.address[address] || []
-      Object.keys(clients).forEach(function(clientId) {
-        clients[clientId].send(addressObj)
-      })
+      var addressMsg = { id: null, method: 'blockchain.address.subscribe', params: [address, status] }
+      self.broadcastMessage(_.values(self.subscribers.address[address]), addressMsg)
 
     }).catch(function(error) {
       logger.error('Electrum.getAddressStatus error: %s', error.stack)
@@ -98,11 +92,22 @@ Electrum.prototype.initialize = function() {
   if (config.get('electrum.irc.active') === 'yes') {
     var irc = new ElectrumIRCClient()
     var ircPromise = irc.initialize().then(function() {
+      function broadcastPeerEvent(eventName, peerNick) {
+        var peerMsg = {
+          id: null,
+          method: 'server.peers.subscribe',
+          params: [eventName, self.peers[peerNick]]
+        }
+        self.broadcastMessage(_.values(self.subscribers.peers), peerMsg)
+      }
+
       irc.on('addPeer', function(peer) {
         self.peers[peer.nick] = [peer.address, peer.host, peer.ports]
+        broadcastPeerEvent('add', peer.nick)
       })
 
       irc.on('removePeer', function(peer) {
+        broadcastPeerEvent('remove', peer.nick)
         delete self.peers[peer.nick]
       })
     })
@@ -112,6 +117,17 @@ Electrum.prototype.initialize = function() {
   return Q.all(promises).then(function() {
     logger.info('Electrum interface ready')
   })
+}
+
+/**
+ * @param {Client[]} clients
+ * @param {Object} message
+ * @param {?number} message.id
+ * @param {string} message.method
+ * @param {*[]} message.params
+ */
+Electrum.prototype.broadcastMessage = function(clients, message) {
+  clients.forEach(function(client) { client.send(message) })
 }
 
 /**
@@ -133,6 +149,7 @@ Electrum.prototype.newClient = function(client) {
         delete self.subscribers.address[addr]
     })
     delete self.subscribers.clientAddresses[clientId]
+    delete self.subscribers.peers[clientId]
   })
 }
 
@@ -243,10 +260,8 @@ Electrum.prototype.newRequest = function(client, request) {
           break
 
         case 'server.peers.subscribe':
-          result = []
-          Object.keys(self.peers).forEach(function(nick) {
-            result.push(self.peers[nick])
-          })
+          result = _.values(self.peers)
+          self.subscribers.peers[client.getId()] = client
           break
 
         case 'server.version':
