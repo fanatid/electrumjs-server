@@ -1,11 +1,34 @@
+var path = require('path')
+
 var _ = require('lodash')
 var Q = require('q')
 
+var optimist = require('optimist')
+  .usage('Usage: $0 [-h] [-c CONFIG]')
+  .options('c', {
+    alias: 'config',
+    describe: 'configuration file',
+    default: 'config.yml'
+  })
+  .options('h', {
+    alias: 'help',
+    describe: 'show this help',
+    default: false
+  })
+
+var argv = optimist.argv
+if (argv.help) {
+  optimist.showHelp()
+  process.exit(0)
+}
+
 /** config localtion */
-process.env.NODE_CONFIG_DIR = _.isUndefined(process.env.NODE_CONFIG_DIR) ? './' : process.env.NODE_CONFIG_DIR
+if (_.isUndefined(process.env.NODE_CONFIG_DIR))
+  process.env.NODE_CONFIG_DIR = path.dirname(path.resolve(argv.config))
 /** config filename */
-process.env.NODE_ENV = _.isUndefined(process.env.NODE_ENV) ? 'config' : process.env.NODE_ENV
-/** load config */
+if (_.isUndefined(process.env.NODE_ENV))
+  process.env.NODE_ENV = argv.config.slice(0, argv.config.length - path.extname(argv.config).length)
+
 var config = require('config')
 
 /** bitcoinjs-lib monkey patching */
