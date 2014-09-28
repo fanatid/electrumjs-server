@@ -100,9 +100,15 @@ MongoStorage.prototype.popHeader = function() {
  * @return {Q.Promise}
  */
 MongoStorage.prototype.getAllHeaders = function() {
-  return Q.ninvoke(this.headers.find().sort({ height: 1 }), 'toArray').then(function(rows) {
-    return rows.map(function(row) { return row.header.toString('hex') })
-  })
+  var stream = this.headers.find().sort({ height: 1 }).stream()
+
+  var headers = []
+  stream.on('data', function(row) { headers.push(row.header.toString('hex')) })
+
+  var deferred = Q.defer()
+  stream.on('error', function(error) { deferred.reject(error) })
+  stream.on('close', function() { deferred.resolve(headers) })
+  return deferred.promise
 }
 
 /**
@@ -151,12 +157,14 @@ MongoStorage.prototype.setSpent = function(cTxId, cIndex, sTxId, sHeight) {
     cTxId: new Buffer(cTxId, 'hex'),
     cIndex: cIndex
   }
-  var newFields = {
-    sTxId: new Buffer(sTxId, 'hex'),
-    sHeight: sHeight
+  var update = {
+    $set: {
+      sTxId: new Buffer(sTxId, 'hex'),
+      sHeight: sHeight
+    }
   }
 
-  return Q.ninvoke(this.history, 'update', query, { $set: newFields })
+  return Q.ninvoke(this.history, 'update', query, update, { multi: true })
 }
 
 /**
@@ -168,8 +176,14 @@ MongoStorage.prototype.setUnspent = function(cTxId, cIndex) {
     cTxId: new Buffer(cTxId, 'hex'),
     cIndex: cIndex
   }
+  var update = {
+    $unset: {
+      sTxId: '',
+      sHeight: ''
+    }
+  }
 
-  return Q.ninvoke(this.history, 'update', query, { $unset: { sTxId: '', sHeight: '' } })
+  return Q.ninvoke(this.history, 'update', query, update, { multi: true })
 }
 
 /**
@@ -182,13 +196,15 @@ MongoStorage.prototype.getAddresses = function(cTxId, cIndex) {
     cTxId: new Buffer(cTxId, 'hex'),
     cIndex: cIndex
   }
+  var stream = this.history.find(query).stream()
 
-  return Q.ninvoke(this.history.find(query), 'toArray').then(function(rows) {
-    if (rows.length === 0)
-      return null
+  var addresses = []
+  stream.on('data', function(row) { addresses.push(base58check.encode(row.address.buffer)) })
 
-    return rows.map(function(row) { return base58check.encode(row.address.buffer) })
-  })
+  var deferred = Q.defer()
+  stream.on('error', function(error) { deferred.reject(error) })
+  stream.on('close', function() { deferred.resolve(addresses.length > 0 ? addresses : null) })
+  return deferred.promise
 }
 
 /**
@@ -196,12 +212,10 @@ MongoStorage.prototype.getAddresses = function(cTxId, cIndex) {
  * @return {Q.Promise}
  */
 MongoStorage.prototype.getTouchedAddresses = function(height) {
-  // http://docs.mongodb.org/manual/reference/method/db.collection.distinct ?
   var query = { $or: [ { cHeight: height }, { sHeight: height } ] }
 
-  return Q.ninvoke(this.history.find(query), 'toArray').then(function(rows) {
-    var addresses = rows.map(function(row) { return base58check.encode(row.address.buffer) })
-    return _.uniq(addresses)
+  return Q.ninvoke(this.history, 'distinct', 'address', query).then(function(rows) {
+    return rows.map(function(row) { return base58check.encode(row.buffer) })
   })
 }
 
@@ -211,26 +225,29 @@ MongoStorage.prototype.getTouchedAddresses = function(height) {
  */
 MongoStorage.prototype.getCoins = function(address) {
   var query = { address: base58check.decode(address) }
+  var stream = this.history.find(query).stream()
 
-  return Q.ninvoke(this.history.find(query), 'toArray').then(function(rows) {
-    function row2history(row) {
-      var obj = {
-        cTxId: row.cTxId.toString('hex'),
-        cIndex: row.cIndex,
-        cValue: row.cValue,
-        cHeight: row.cHeight,
-        sTxId: null,
-        sHeight: null
-      }
-
-      if (!_.isUndefined(row.sTxId))
-        obj = _.extend(obj, { sTxId: row.sTxId.toString('hex'), sHeight: row.sHeight })
-
-      return obj
+  var history = []
+  stream.on('data', function(row) {
+    var obj = {
+      cTxId: row.cTxId.toString('hex'),
+      cIndex: row.cIndex,
+      cValue: row.cValue,
+      cHeight: row.cHeight,
+      sTxId: null,
+      sHeight: null
     }
 
-    return rows.map(row2history)
+    if (!_.isUndefined(row.sTxId))
+      obj = _.extend(obj, { sTxId: row.sTxId.toString('hex'), sHeight: row.sHeight })
+
+    history.push(obj)
   })
+
+  var deferred = Q.defer()
+  stream.on('error', function(error) { deferred.reject(error) })
+  stream.on('close', function() { deferred.resolve(history) })
+  return deferred.promise
 }
 
 

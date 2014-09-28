@@ -201,6 +201,7 @@ PostgresStorage.prototype.setSpent = function(cTxId, cIndex, sTxId, sHeight) {
 /**
  * @param {string} cTxId
  * @param {number} cIndex
+ * @return {Q.Promise}
  */
 PostgresStorage.prototype.setUnspent = function(cTxId, cIndex) {
   var sql = 'UPDATE history SET sTxId=$3, sHeight=$4 WHERE cTxId=$1 AND cIndex=$2'
