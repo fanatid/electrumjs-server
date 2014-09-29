@@ -9,7 +9,7 @@ Features
   * Language: JavaScript
   * Only node.js with harmony mode (>=v0.11)
   * Required bitcoind
-  * Supported networks: bitcoin, testnet, litecoin, litecoin-testnet
+  * Supported networks: bitcoin, testnet, litecoin and other
   * Supported storage: MongoDB, PostgreSQL
   * Supported transports: TCP, HTTP, WebSocket
 

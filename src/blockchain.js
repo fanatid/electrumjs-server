@@ -551,7 +551,6 @@ Blockchain.prototype.sendRawTx = function(rawTx) {
  * @return {Q.Promise}
  */
 Blockchain.prototype.getMerkle = function(txHash, height) {
-  // Todo: move to subprocess
   var self = this
 
   var deferred = Q.defer()
