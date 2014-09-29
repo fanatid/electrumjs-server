@@ -6,6 +6,8 @@ var ECPubKey = bitcoin.ECPubKey
 var _ = require('lodash')
 var Q = require('q')
 
+var logger = require('./logger').logger
+
 
 /**
  * @param {number[]} prevTime
@@ -68,6 +70,8 @@ function revHex(s) {
  * @return {Q.Promise}
  */
 function getFullBlock(bitcoinClient, blockHash) {
+  var st = process.hrtime()
+
   return Q.ninvoke(bitcoinClient, 'cmd', 'getblock', blockHash).spread(function(block) {
     if (block.height === 0) {
       block.tx = []
@@ -75,27 +79,28 @@ function getFullBlock(bitcoinClient, blockHash) {
       return block
     }
 
-    return Q.Promise(function(resolve, reject) {
-      var batch = block.tx.map(function(txId) {
-        return { method: 'getrawtransaction', params: [txId] }
-      })
+    var deferred = Q.defer()
 
-      var resultTx = []
-      function callback(error, rawTx) {
-        if (error) {
-          reject(error)
-          return
-        }
-
-        resultTx.push(bitcoin.Transaction.fromHex(rawTx))
-        if (resultTx.length === batch.length) {
-          block.tx = resultTx
-          resolve(block)
-        }
-      }
-
-      bitcoinClient.cmd(batch, callback)
+    var batch = block.tx.map(function(txId) {
+      return { method: 'getrawtransaction', params: [txId] }
     })
+
+    block.tx = []
+    bitcoinClient.cmd(batch, function(error, rawTx) {
+      if (error)
+        return deferred.reject(error)
+
+      block.tx.push(bitcoin.Transaction.fromHex(rawTx))
+      if (block.tx.length === batch.length)
+        return deferred.resolve(block)
+    })
+
+    return deferred.promise
+
+  }).then(function(block) {
+    logger.verbose('getFullBlock #%s, %sms', block.height, spendTime(st))
+    return block
+
   })
 }
 

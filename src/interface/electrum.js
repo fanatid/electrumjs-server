@@ -261,7 +261,7 @@ Electrum.prototype.newRequest = function(client, request) {
 
         case 'server.peers.subscribe':
           result = _.values(self.peers)
-          self.subscribers.peers[client.getId()] = client
+          //self.subscribers.peers[client.getId()] = client
           break
 
         case 'server.version':

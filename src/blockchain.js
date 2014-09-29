@@ -55,7 +55,8 @@ Blockchain.prototype.initialize = function() {
         host: config.get('bitcoind.host'),
         port: config.get('bitcoind.port'),
         user: config.get('bitcoind.user'),
-        pass: config.get('bitcoind.password')
+        pass: config.get('bitcoind.password'),
+        timeout: 60000
       })
       self.bitcoind = Q.nbind(self.bitcoindClient.cmd, self.bitcoindClient)
 
