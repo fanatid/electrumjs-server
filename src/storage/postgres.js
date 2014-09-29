@@ -4,6 +4,7 @@ var base58check = require('bs58check')
 var config = require('config')
 var _ = require('lodash')
 var pg = require('pg')
+var QueryStream = require('pg-query-stream')
 var Q = require('q')
 
 var logger = require('../logger').logger
@@ -151,10 +152,15 @@ PostgresStorage.prototype.popHeader = function() {
  */
 PostgresStorage.prototype.getAllHeaders = function() {
   var sql = 'SELECT header FROM headers ORDER BY height'
+  var stream = this.client.query(new QueryStream(sql))
 
-  return this.query(sql).then(function(result) {
-    return _.pluck(result.rows, 'header')
-  })
+  var headers = []
+  stream.on('data', function(row) { headers.push(row.header) })
+
+  var deferred = Q.defer()
+  stream.on('error', function(error) { deferred.reject(error) })
+  stream.on('end', function() { deferred.resolve(headers) })
+  return deferred.promise
 }
 
 /**
@@ -218,13 +224,15 @@ PostgresStorage.prototype.setUnspent = function(cTxId, cIndex) {
 PostgresStorage.prototype.getAddresses = function(cTxId, cIndex) {
   var sql = 'SELECT address FROM history WHERE cTxId = $1 AND cIndex = $2'
   var params = [new Buffer(cTxId, 'hex'), cIndex]
+  var stream = this.client.query(new QueryStream(sql, params))
 
-  return this.query(sql, params).then(function(result) {
-    if (result.rowCount === 0)
-      return null
+  var addresses = []
+  stream.on('data', function(row) { addresses.push(base58check.encode(row.address)) })
 
-    return result.rows.map(function(row) { return base58check.encode(row.address) })
-  })
+  var deferred = Q.defer()
+  stream.on('error', function(error) { deferred.reject(error) })
+  stream.on('end', function() { deferred.resolve(addresses.length > 0 ? addresses : null) })
+  return deferred.promise
 }
 
 /**
@@ -234,11 +242,15 @@ PostgresStorage.prototype.getAddresses = function(cTxId, cIndex) {
 PostgresStorage.prototype.getTouchedAddresses = function(height) {
   var sql = 'SELECT DISTINCT address FROM history WHERE cHeight = $1 OR sHeight = $1'
   var params = [height]
+  var stream = this.client.query(new QueryStream(sql, params))
 
-  return this.query(sql, params).then(function(result) {
-    var addresses = _.pluck(result.rows, 'address')
-    return addresses.map(base58check.encode)
-  })
+  var addresses = []
+  stream.on('data', function(row) { addresses.push(base58check.encode(row.address)) })
+
+  var deferred = Q.defer()
+  stream.on('error', function(error) { deferred.reject(error) })
+  stream.on('end', function() { deferred.resolve(addresses) })
+  return deferred.promise
 }
 
 /**
@@ -248,26 +260,29 @@ PostgresStorage.prototype.getTouchedAddresses = function(height) {
 PostgresStorage.prototype.getCoins = function(address) {
   var sql = 'SELECT * FROM history WHERE address = $1'
   var params = [base58check.decode(address)]
+  var stream = this.client.query(new QueryStream(sql, params))
 
-  return this.query(sql, params).then(function(result) {
-    function row2history(row) {
-      var obj = {
-        cTxId: row.ctxid.toString('hex'),
-        cIndex: parseInt(row.cindex),
-        cValue: parseInt(row.cvalue),
-        cHeight: row.cheight,
-        sTxId: null,
-        sHeight: null
-      }
-
-      if (row.stxid !== null)
-        obj = _.extend(obj, { sTxId: row.stxid.toString('hex'), sHeight: row.sheight })
-
-      return obj
+  var coins = []
+  stream.on('data', function(row) {
+    var coin = {
+      cTxId: row.ctxid.toString('hex'),
+      cIndex: parseInt(row.cindex),
+      cValue: parseInt(row.cvalue),
+      cHeight: row.cheight,
+      sTxId: null,
+      sHeight: null
     }
 
-    return result.rows.map(row2history)
+    if (row.stxid !== null)
+      coin = _.extend(coin, { sTxId: row.stxid.toString('hex'), sHeight: row.sheight })
+
+    coins.push(coin)
   })
+
+  var deferred = Q.defer()
+  stream.on('error', function(error) { deferred.reject(error) })
+  stream.on('end', function() { deferred.resolve(coins) })
+  return deferred.promise
 }
 
 
