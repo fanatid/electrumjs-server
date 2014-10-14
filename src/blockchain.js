@@ -99,7 +99,15 @@ Blockchain.prototype.initialize = function() {
       self.updateLastBlockHash()
 
       /** sync storage with bitcoind */
+      self.syncStatus = {
+        status: 'sync',
+        progress: {
+          count: self.getBlockCount(),
+          total: self.getBlockCount()
+        }
+      }
       yield self.catchUp()
+      self.syncStatus.status = 'finished'
       /** catch up new blocks and get info from mempool */
       self.mempool = { txIds: {}, spent: {}, addrs: {}, coins: {} }
       self.on('newHeight', function() {
@@ -234,6 +242,11 @@ Blockchain.prototype.catchUp = function() {
 
           }
 
+          if (self.syncStatus.status === 'sync') {
+            self.syncStatus.progress.count = self.getBlockCount()
+            self.syncStatus.progress.total = blockCount
+          }
+
           self.emit('newHeight', fullBlock.height)
         }
 
@@ -267,8 +280,11 @@ Blockchain.prototype.importBlock = function(block, revert) {
       var stat = {
         st: process.hrtime(),
         inputs: 0,
-        outputs: 0
+        outputs: 0,
+        tAddresses: new util.Set()
       }
+      if (self.syncStatus.status !== 'finished')
+        stat.tAddresses.add = function() {}
 
       if (_.isUndefined(revert))
         revert = false
@@ -286,17 +302,12 @@ Blockchain.prototype.importBlock = function(block, revert) {
       self.updateLastBlockHash()
 
       var importPromises = util.groupTransactions(block.tx).map(function(transactions) {
-        transactions.forEach(function(tx) {
-          stat.inputs += tx.ins.length
-          stat.outputs += tx.outs.length
-        })
-
-        return self.importTransactions(transactions, isImport)
+        return self.importTransactions(transactions, isImport, stat)
       })
       yield Q.all(importPromises)
 
-      var touchedAddress = yield self.storage.getTouchedAddresses(self.getBlockCount() - 1)
-      touchedAddress.forEach(function(addr) { self.emit('touchedAddress', addr) })
+      if (self.syncStatus.status === 'finished')
+        stat.tAddresses.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
 
       /** done */
       logger.info('%s block #%s, %s transactions, %s/%s, %sms',
@@ -315,16 +326,22 @@ Blockchain.prototype.importBlock = function(block, revert) {
 /**
  * @param {bitcoinjs-lib.Transaction[]} transactions
  * @param {boolean} isImport
+ * @param {Object} stat
+ * @param {number} stat.inputs
+ * @param {number} stat.outputs
+ * @param {Set} stat.tAddresses
  * @return {Q.Promise}
  */
-Blockchain.prototype.importTransactions = function(transactions, isImport) {
+Blockchain.prototype.importTransactions = function(transactions, isImport, stat) {
   var self = this
 
   var deferred = Q.defer()
   Q.spawn(function* () {
+    var touchAddress = stat.tAddresses.add.bind(stat.tAddresses)
+
     try {
       var currentHeight = self.getBlockCount() - 1
-      var inIndex, outIndex, input, cTxId
+      var inIndex, outIndex, input, cTxId, addresses
 
       if (!isImport)
         transactions.reverse()
@@ -333,27 +350,48 @@ Blockchain.prototype.importTransactions = function(transactions, isImport) {
         var tx = transactions[txIndex]
         var txId = tx.getId()
 
+        stat.inputs += tx.ins.length
+        stat.outputs += tx.outs.length
+
         if (isImport) {
           for (inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
             input = tx.ins[inIndex]
             cTxId = util.hashEncode(input.hash)
             yield self.storage.setSpent(cTxId, input.index, txId, currentHeight)
+
+            if (self.syncStatus.status === 'finished') {
+              addresses = yield self.storage.getAddresses(cTxId, input.index)
+              addresses.forEach(touchAddress)
+            }
           }
 
           for (outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
             var output = tx.outs[outIndex]
-            var addresses = util.getAddressesFromOutputScript(output.script, self.network)
+            addresses = util.getAddressesFromOutputScript(output.script, self.network)
             for (var addressId = 0; addressId < addresses.length; ++addressId)
               yield self.storage.addCoin(addresses[addressId], txId, outIndex, output.value, currentHeight)
+
+            if (self.syncStatus.status === 'finished')
+              addresses.forEach(touchAddress)
           }
+
         } else {
-          for (outIndex = 0; outIndex < tx.outs.length; ++outIndex)
+          for (outIndex = 0; outIndex < tx.outs.length; ++outIndex) {
             yield self.storage.removeCoin(txId, outIndex)
+
+            if (self.syncStatus.status === 'finished')
+              util.getAddressesFromOutputScript(tx.outs[outIndex].script, self.network).forEach(touchAddress)
+          }
 
           for (inIndex = 0; inIndex < tx.ins.length; ++inIndex) {
             input = tx.ins[inIndex]
             cTxId = util.hashEncode(input.hash)
             yield self.storage.setUnspent(txId, input.index)
+
+            if (self.syncStatus.status === 'finished') {
+              addresses = yield self.storage.getAddresses(cTxId, input.index)
+              addresses.forEach(touchAddress)
+            }
           }
         }
       }
@@ -388,7 +426,7 @@ Blockchain.prototype.updateMempool = function() {
       var stat = {
         st: process.hrtime(),
         added: 0,
-        touchedAddress: new util.Set()
+        tAddresses: new util.Set()
       }
 
       var mempoolTxIds = (yield self.bitcoind('getrawmempool'))[0]
@@ -411,7 +449,7 @@ Blockchain.prototype.updateMempool = function() {
           self.mempool.spent[cTxId] = self.mempool.spent[cTxId] || {}
           self.mempool.spent[cTxId][cIndex] = txId
 
-          stat.touchedAddress.add([cTxId, cIndex].join(','))
+          stat.tAddresses.add([cTxId, cIndex].join(','))
         })
 
         tx.outs.forEach(function(output, outIndex) {
@@ -423,30 +461,29 @@ Blockchain.prototype.updateMempool = function() {
             self.mempool.coins[address][txId] = self.mempool.coins[address][txId] || {}
             self.mempool.coins[address][txId][outIndex] = output.value
 
-            stat.touchedAddress.add(address)
+            stat.tAddresses.add(address)
           })
         })
       }
 
       var promises = []
-      stat.touchedAddress.get().forEach(function(addr) {
+      stat.tAddresses.get().forEach(function(addr) {
         var items = addr.split(',')
         if (items.length === 1)
           return
 
-        stat.touchedAddress.remove(addr)
+        stat.tAddresses.remove(addr)
         if (!_.isUndefined(self.mempool.addrs[addr])) {
-          self.mempool.addrs[addr].forEach(function(value) { stat.touchedAddress.add(value) })
+          self.mempool.addrs[addr].forEach(function(value) { stat.tAddresses.add(value) })
           return
         }
 
         promises.push(self.storage.getAddresses(items[0], parseInt(items[1])).then(function(addrs) {
-          if (addrs !== null)
-            addrs.forEach(function(addr) { stat.touchedAddress.add(addr) })
+          addrs.forEach(function(addr) { stat.tAddresses.add(addr) })
         }))
       })
       Q.all(promises).then(function() {
-        stat.touchedAddress.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
+        stat.tAddresses.get().forEach(function(addr) { self.emit('tAddresses', addr) })
       })
 
       logger.verbose('Update mempool +%s, now %s, %sms',

@@ -59,8 +59,6 @@ MongoStorage.prototype.initialize = function() {
       self.history = yield Q.ninvoke(self.db, 'createCollection', 'history')
       yield Q.ninvoke(self.history, 'ensureIndex', 'address')
       yield Q.ninvoke(self.history, 'ensureIndex', { cTxId: 1, cIndex: 1 })
-      yield Q.ninvoke(self.history, 'ensureIndex', 'cHeight')
-      yield Q.ninvoke(self.history, 'ensureIndex', 'sHeight')
 
       /** done */
       logger.info('Storage (MongoDB) ready')
@@ -203,20 +201,8 @@ MongoStorage.prototype.getAddresses = function(cTxId, cIndex) {
 
   var deferred = Q.defer()
   stream.on('error', function(error) { deferred.reject(error) })
-  stream.on('close', function() { deferred.resolve(addresses.length > 0 ? addresses : null) })
+  stream.on('close', function() { deferred.resolve(addresses) })
   return deferred.promise
-}
-
-/**
- * @param {number} height
- * @return {Q.Promise}
- */
-MongoStorage.prototype.getTouchedAddresses = function(height) {
-  var query = { $or: [ { cHeight: height }, { sHeight: height } ] }
-
-  return Q.ninvoke(this.history, 'distinct', 'address', query).then(function(rows) {
-    return rows.map(function(row) { return base58check.encode(row.buffer) })
-  })
 }
 
 /**

@@ -4,7 +4,7 @@ var expect = require('chai').expect
 var _ = require('lodash')
 
 var runElectrumTests = require('./interface/electrum').runElectrumTests
-var TCPTransport = require('./transport/tcp').TCPTransport
+var tcp = require('./transport/tcp')
 var HTTPTransport = require('./transport/http').HTTPTransport
 var WSTransport = require('./transport/ws').WSTransport
 
@@ -45,7 +45,7 @@ describe('Electrum interface', function() {
   describe('TCP transport', function() {
     beforeEach(function(done) {
       resolveHost(config.electrum.tcp.host, function(address) {
-        params.transport = new TCPTransport(address, config.electrum.tcp.port)
+        params.transport = new tcp.TCPTransport(address, config.electrum.tcp.port)
         params.transport.once('ready', done)
       })
     })

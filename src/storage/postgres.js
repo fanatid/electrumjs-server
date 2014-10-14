@@ -96,8 +96,6 @@ PostgresStorage.prototype.initialize = function() {
         yield self.query(SQL_HISTORY_CREATE_TABLE)
         yield self.query('CREATE INDEX history_address_idx ON history (address)')
         yield self.query('CREATE INDEX history_ctxid_cindex_idx ON history (cTxId, cIndex)')
-        yield self.query('CREATE INDEX history_cheight_idx ON history (cHeight)')
-        yield self.query('CREATE INDEX history_sheight_idx ON history (sHeight)')
 
       }
 
@@ -224,24 +222,6 @@ PostgresStorage.prototype.setUnspent = function(cTxId, cIndex) {
 PostgresStorage.prototype.getAddresses = function(cTxId, cIndex) {
   var sql = 'SELECT address FROM history WHERE cTxId = $1 AND cIndex = $2'
   var params = [new Buffer(cTxId, 'hex'), cIndex]
-  var stream = this.client.query(new QueryStream(sql, params))
-
-  var addresses = []
-  stream.on('data', function(row) { addresses.push(base58check.encode(row.address)) })
-
-  var deferred = Q.defer()
-  stream.on('error', function(error) { deferred.reject(error) })
-  stream.on('end', function() { deferred.resolve(addresses.length > 0 ? addresses : null) })
-  return deferred.promise
-}
-
-/**
- * @param {number} height
- * @return {Q.Promise}
- */
-PostgresStorage.prototype.getTouchedAddresses = function(height) {
-  var sql = 'SELECT DISTINCT address FROM history WHERE cHeight = $1 OR sHeight = $1'
-  var params = [height]
   var stream = this.client.query(new QueryStream(sql, params))
 
   var addresses = []

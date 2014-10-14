@@ -3,8 +3,8 @@ module.exports = {
     electrum: '0.9'
   },
   storage: {
-    mongo: '2',
-    postgres: '5',
+    mongo: '3',
+    postgres: '6',
     redis: '1'
   }
 }
