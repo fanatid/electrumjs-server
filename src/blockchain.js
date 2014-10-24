@@ -483,7 +483,7 @@ Blockchain.prototype.updateMempool = function() {
         }))
       })
       Q.all(promises).then(function() {
-        stat.tAddresses.get().forEach(function(addr) { self.emit('tAddresses', addr) })
+        stat.tAddresses.get().forEach(function(addr) { self.emit('touchedAddress', addr) })
       })
 
       logger.verbose('Update mempool +%s, now %s, %sms',
