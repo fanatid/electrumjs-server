@@ -301,10 +301,7 @@ Blockchain.prototype.importBlock = function(block, revert) {
 
       self.updateLastBlockHash()
 
-      var importPromises = util.groupTransactions(block.tx).map(function(transactions) {
-        return self.importTransactions(transactions, isImport, stat)
-      })
-      yield Q.all(importPromises)
+      yield self.importTransactions(block.tx, isImport, stat)
 
       if (self.syncStatus.status === 'finished')
         stat.tAddresses.get().forEach(function(addr) { self.emit('touchedAddress', addr) })

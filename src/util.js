@@ -153,45 +153,6 @@ function rawHeader2block(rawHeader) {
 
 
 /**
- * @param {bitcoinjs-lib.Transaction[]}
- * @param {bitcoinjs-lib.Transaction[][]}
- */
-function groupTransactions(transactions) {
-  var transactionsIds = _.zipObject(transactions.map(function(tx) { return [tx.getId(), tx] }))
-  var resultIds = {}
-  var result = []
-
-  function sort(tx, topTx, level) {
-    if (!_.isUndefined(resultIds[tx.getId()]))
-      return
-
-    tx.ins.forEach(function(input) {
-      var inputId = Array.prototype.reverse.call(new Buffer(input.hash)).toString('hex')
-      if (_.isUndefined(transactionsIds[inputId]))
-        return
-
-      if (transactionsIds[inputId].getId() === topTx.getId())
-        throw new Error('graph is cyclical')
-
-      sort(transactionsIds[inputId], tx, level+1)
-    })
-
-    resultIds[tx.getId()] = true
-    result[result.length - 1].push(tx)
-    if (level === 0 && result.length > 1)
-      result[result.length - 1].reverse()
-  }
-
-  transactions.forEach(function(tx) {
-    result.push([])
-    sort(tx, tx, 0)
-  })
-
-  return result
-}
-
-
-/**
  * @param {bitcoinjs-lib.Script} script
  * @param {Object} network
  * @param {number} network.pubKeyHash
@@ -240,8 +201,6 @@ module.exports = {
   getFullBlock: getFullBlock,
   block2rawHeader: block2rawHeader,
   rawHeader2block: rawHeader2block,
-
-  groupTransactions: groupTransactions,
 
   getAddressesFromOutputScript: getAddressesFromOutputScript
 }
