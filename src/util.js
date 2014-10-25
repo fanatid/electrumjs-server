@@ -3,7 +3,6 @@ var crypto = require('crypto')
 var bitcoin = require('bitcoinjs-lib')
 var Address = bitcoin.Address
 var ECPubKey = bitcoin.ECPubKey
-var _ = require('lodash')
 var Q = require('q')
 
 var logger = require('./logger').logger

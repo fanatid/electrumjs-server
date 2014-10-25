@@ -154,6 +154,7 @@ Electrum.prototype.newClient = function(client) {
 }
 
 /**
+ * @param {Client} client
  * @param {Object} request
  */
 Electrum.prototype.newRequest = function(client, request) {
@@ -349,7 +350,9 @@ Electrum.prototype.getBalance = function(address) {
  */
 Electrum.prototype.getUnspentCoins = function(address) {
   return this.blockchain.getCoins(address).then(function(coins) {
-    coins = coins.filter(function(coin) { return coin.cHeight !== 0 && coin.sTxId === null })
+    // Not full electrum compatibility.. but it's right
+    //coins = coins.filter(function(coin) { return coin.cHeight !== 0 && coin.sTxId === null })
+    coins = coins.filter(function(coin) { return coin.sTxId === null })
     coins = coins.map(function(coin) {
       return { tx_hash: coin.cTxId, tx_pos: coin.cIndex, value: coin.cValue, height: coin.cHeight }
     })

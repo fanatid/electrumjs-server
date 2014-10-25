@@ -540,7 +540,7 @@ Blockchain.prototype.getCoins = function(address) {
       Object.keys(mempoolCoins[cTxId]).forEach(function(cIndex) {
         coins.push({
           cTxId: cTxId,
-          cIndex: cIndex,
+          cIndex: parseInt(cIndex),
           cValue: mempoolCoins[cTxId][cIndex],
           cHeight: 0,
           sTxId: null,
