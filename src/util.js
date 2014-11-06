@@ -105,12 +105,12 @@ function getFullBlock(bitcoinClient, blockHash) {
 
 /**
  * @typedef {Object} BitcoinBlock
- * @param {number} block.version
- * @param {string} block.previousblockhash
- * @param {string} block.merkleroot
- * @param {number} block.time
- * @param {string} block.bits
- * @param {number} block.nonce
+ * @param {number} version
+ * @param {string} previousblockhash
+ * @param {string} merkleroot
+ * @param {number} time
+ * @param {string} bits
+ * @param {number} nonce
  */
 
 /**

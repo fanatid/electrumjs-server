@@ -387,11 +387,11 @@ Electrum.prototype.getHeader = function(height) {
  * @return {Q.Promise}
  */
 Electrum.prototype.getMerkle = function(txId, height) {
-  return this.blockchain.getMerkle(txId, height).then(function(merkle) {
+  return this.blockchain.getMerkle(txId, height).then(function(result) {
     return {
-      block_height: height,
-      merkle: merkle.tree,
-      pos: merkle.pos
+      block_height: result.height,
+      merkle: result.tree,
+      pos: result.pos
     }
   })
 }

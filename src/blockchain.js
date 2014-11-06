@@ -580,21 +580,26 @@ Blockchain.prototype.sendRawTx = function(rawTx) {
 }
 
 /**
- * @param {string} txHash
- * @param {number} height
+ * @param {string} txId
+ * @param {(number|NaN)} [height]
  * @return {Q.Promise}
  */
-Blockchain.prototype.getMerkle = function(txHash, height) {
+Blockchain.prototype.getMerkle = function(txId, height) {
   var self = this
 
   var deferred = Q.defer()
   Q.spawn(function* () {
     try {
-      var blockHash = (yield self.bitcoind('getblockhash', height))[0]
+      var blockHash
+      if (isNaN(height) || _.isUndefined(height))
+        blockHash = (yield self.bitcoind('getrawtransaction', txId, 1))[0].blockhash
+      else
+        blockHash = (yield self.bitcoind('getblockhash', height))[0]
+
       var block = (yield self.bitcoind('getblock', blockHash))[0]
 
       var merkle = block.tx.map(util.hashDecode)
-      var targetHash = util.hashDecode(txHash)
+      var targetHash = util.hashDecode(txId)
       var result = []
       while (merkle.length !== 1) {
         if (merkle.length % 2 === 1)
@@ -616,7 +621,7 @@ Blockchain.prototype.getMerkle = function(txHash, height) {
         merkle = newMerkle
       }
 
-      deferred.resolve({ tree: result, pos: block.tx.indexOf(txHash) })
+      deferred.resolve({ height: block.height, tree: result, pos: block.tx.indexOf(txId) })
 
     } catch (error) {
       deferred.reject(error)
