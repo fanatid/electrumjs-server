@@ -581,54 +581,67 @@ Blockchain.prototype.sendRawTx = function(rawTx) {
 
 /**
  * @param {string} txId
- * @param {(number|NaN)} [height]
+ * @param {number} [height]
  * @return {Q.Promise}
  */
 Blockchain.prototype.getMerkle = function(txId, height) {
   var self = this
 
-  var deferred = Q.defer()
-  Q.spawn(function* () {
-    try {
-      var blockHash
-      if (isNaN(height) || _.isUndefined(height))
-        blockHash = (yield self.bitcoind('getrawtransaction', txId, 1))[0].blockhash
-      else
-        blockHash = (yield self.bitcoind('getblockhash', height))[0]
+  var promise
+  if (_.isNumber(height) && !_.isNaN(height)) {
+    promise = self.bitcoind('getblockhash', height).spread(function(result) { return result })
 
-      var block = (yield self.bitcoind('getblock', blockHash))[0]
-
-      var merkle = block.tx.map(util.hashDecode)
-      var targetHash = util.hashDecode(txId)
-      var result = []
-      while (merkle.length !== 1) {
-        if (merkle.length % 2 === 1)
-          merkle.push(merkle[merkle.length-1])
-
-        var newMerkle = []
-        for (var i = 0; i < merkle.length; i += 2) {
-          var newHash = util.hash256(merkle[i] + merkle[i+1])
-          newMerkle.push(newHash)
-
-          if (bufferEqual(merkle[i], targetHash)) {
-            result.push(util.hashEncode(merkle[i+1]))
-            targetHash = newHash
-          } else if (bufferEqual(merkle[i+1], targetHash)) {
-            result.push(util.hashEncode(merkle[i]))
-            targetHash = newHash
-          }
-        }
-        merkle = newMerkle
+  } else {
+    promise = self.bitcoind('getrawtransaction', txId, 1).spread(function(info) {
+      if (_.isUndefined(info.blockhash)) {
+        var error = new Error()
+        error.code = -1
+        throw error
       }
 
-      deferred.resolve({ height: block.height, tree: result, pos: block.tx.indexOf(txId) })
+      return info.blockhash
+    })
 
-    } catch (error) {
-      deferred.reject(error)
+  }
 
+  return promise.then(function(blockHash) {
+    return self.bitcoind('getblock', blockHash)
+
+  }).spread(function(block) {
+    var merkle = block.tx.map(util.hashDecode)
+    var targetHash = util.hashDecode(txId)
+    var result = []
+    while (merkle.length !== 1) {
+      if (merkle.length % 2 === 1)
+        merkle.push(_.last(merkle))
+
+      var newMerkle = []
+      for (var i = 0; i < merkle.length; i += 2) {
+        var newHash = util.hash256(Buffer.concat([merkle[i], merkle[i+1]]))
+        newMerkle.push(newHash)
+
+        if (bufferEqual(merkle[i], targetHash)) {
+          result.push(util.hashEncode(merkle[i+1]))
+          targetHash = newHash
+        } else if (bufferEqual(merkle[i+1], targetHash)) {
+          result.push(util.hashEncode(merkle[i]))
+          targetHash = newHash
+        }
+      }
+      merkle = newMerkle
     }
+
+    return { height: block.height, tree: result, pos: block.tx.indexOf(txId) }
+
+  }).catch(function(error) {
+    if (error.code === -1)
+      throw new Error('BlockNotFound')
+
+    if (error.code === -5)
+      throw new Error('TransactionNotFound')
+
+    throw error
   })
-  return deferred.promise
 }
 
 /**
