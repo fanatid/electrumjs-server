@@ -67,15 +67,14 @@ inherits(PostgresStorage, Storage)
 /**
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.initialize = function() {
+PostgresStorage.prototype.initialize = function () {
   var self = this
-  if (self._isInialized)
-    return Q()
+  if (self._isInialized) { return Q() }
 
   self._isInialized = true
 
   var deferred = Q.defer()
-  Q.spawn(function* () {
+  Q.spawn(function* initProcess() {
     try {
       var row
       var serverNetwork = config.get('server.network')
@@ -96,20 +95,21 @@ PostgresStorage.prototype.initialize = function() {
         yield self.query(SQL_HISTORY_CREATE_TABLE)
         yield self.query('CREATE INDEX history_address_idx ON history (address)')
         yield self.query('CREATE INDEX history_ctxid_cindex_idx ON history (cTxId, cIndex)')
-
       }
 
       /** check version */
       row = (yield self.query('SELECT value FROM info WHERE key = $1', ['version'])).rows[0]
       var dbVersion = JSON.parse(row.value)
-      if (dbVersion !== storageVersion)
+      if (dbVersion !== storageVersion) {
         throw new Error('Storage version is ' + storageVersion + ', whereas db version is ' + dbVersion)
+      }
 
       /** check network */
       row = (yield self.query('SELECT value FROM info WHERE key = $1', ['network'])).rows[0]
       var dbNetwork = JSON.parse(row.value)
-      if (dbNetwork !== serverNetwork)
+      if (dbNetwork !== serverNetwork) {
         throw new Error('Server network is ' + serverNetwork + ', whereas db network is ' + dbNetwork)
+      }
 
       /** done */
       logger.info('Storage (PostgreSQL) ready')
@@ -129,7 +129,7 @@ PostgresStorage.prototype.initialize = function() {
  * @param {number} height
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.pushHeader = function(header, height) {
+PostgresStorage.prototype.pushHeader = function (header, height) {
   var sql = 'INSERT INTO headers (height, header) VALUES ($1, $2)'
   var params = [height, header]
 
@@ -139,7 +139,7 @@ PostgresStorage.prototype.pushHeader = function(header, height) {
 /**
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.popHeader = function() {
+PostgresStorage.prototype.popHeader = function () {
   var sql = 'DELETE FROM headers WHERE height IN (SELECT height FROM headers ORDER BY height DESC LIMIT 1)'
 
   return this.query(sql)
@@ -148,16 +148,16 @@ PostgresStorage.prototype.popHeader = function() {
 /**
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.getAllHeaders = function() {
+PostgresStorage.prototype.getAllHeaders = function () {
   var sql = 'SELECT header FROM headers ORDER BY height'
   var stream = this.client.query(new QueryStream(sql))
 
   var headers = []
-  stream.on('data', function(row) { headers.push(row.header) })
+  stream.on('data', function (row) { headers.push(row.header) })
 
   var deferred = Q.defer()
-  stream.on('error', function(error) { deferred.reject(error) })
-  stream.on('end', function() { deferred.resolve(headers) })
+  stream.on('error', function (error) { deferred.reject(error) })
+  stream.on('end', function () { deferred.resolve(headers) })
   return deferred.promise
 }
 
@@ -169,7 +169,7 @@ PostgresStorage.prototype.getAllHeaders = function() {
  * @param {number} cHeight
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.addCoin = function(address, cTxId, cIndex, cValue, cHeight) {
+PostgresStorage.prototype.addCoin = function (address, cTxId, cIndex, cValue, cHeight) {
   var sql = 'INSERT INTO history (address, cTxId, cIndex, cValue, cHeight) VALUES ($1, $2, $3, $4, $5)'
   var params = [base58check.decode(address), new Buffer(cTxId, 'hex'), cIndex, cValue, cHeight]
 
@@ -181,7 +181,7 @@ PostgresStorage.prototype.addCoin = function(address, cTxId, cIndex, cValue, cHe
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.removeCoin = function(cTxId, cIndex) {
+PostgresStorage.prototype.removeCoin = function (cTxId, cIndex) {
   var sql = 'DELETE FROM history WHERE cTxId=$1 AND cIndex=$2'
   var params = [new Buffer(cTxId, 'hex'), cIndex]
 
@@ -195,7 +195,7 @@ PostgresStorage.prototype.removeCoin = function(cTxId, cIndex) {
  * @param {number} sHeight
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.setSpent = function(cTxId, cIndex, sTxId, sHeight) {
+PostgresStorage.prototype.setSpent = function (cTxId, cIndex, sTxId, sHeight) {
   var sql = 'UPDATE history SET sTxId=$3, sHeight=$4 WHERE cTxId=$1 AND cIndex=$2'
   var params = [new Buffer(cTxId, 'hex'), cIndex, new Buffer(sTxId, 'hex'), sHeight]
 
@@ -207,7 +207,7 @@ PostgresStorage.prototype.setSpent = function(cTxId, cIndex, sTxId, sHeight) {
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.setUnspent = function(cTxId, cIndex) {
+PostgresStorage.prototype.setUnspent = function (cTxId, cIndex) {
   var sql = 'UPDATE history SET sTxId=$3, sHeight=$4 WHERE cTxId=$1 AND cIndex=$2'
   var params = [new Buffer(cTxId, 'hex'), cIndex, null, null]
 
@@ -219,17 +219,17 @@ PostgresStorage.prototype.setUnspent = function(cTxId, cIndex) {
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.getAddresses = function(cTxId, cIndex) {
+PostgresStorage.prototype.getAddresses = function (cTxId, cIndex) {
   var sql = 'SELECT address FROM history WHERE cTxId = $1 AND cIndex = $2'
   var params = [new Buffer(cTxId, 'hex'), cIndex]
   var stream = this.client.query(new QueryStream(sql, params))
 
   var addresses = []
-  stream.on('data', function(row) { addresses.push(base58check.encode(row.address)) })
+  stream.on('data', function (row) { addresses.push(base58check.encode(row.address)) })
 
   var deferred = Q.defer()
-  stream.on('error', function(error) { deferred.reject(error) })
-  stream.on('end', function() { deferred.resolve(addresses) })
+  stream.on('error', function (error) { deferred.reject(error) })
+  stream.on('end', function () { deferred.resolve(addresses) })
   return deferred.promise
 }
 
@@ -237,13 +237,13 @@ PostgresStorage.prototype.getAddresses = function(cTxId, cIndex) {
  * @param {string} address
  * @return {Q.Promise}
  */
-PostgresStorage.prototype.getCoins = function(address) {
+PostgresStorage.prototype.getCoins = function (address) {
   var sql = 'SELECT * FROM history WHERE address = $1'
   var params = [base58check.decode(address)]
   var stream = this.client.query(new QueryStream(sql, params))
 
   var coins = []
-  stream.on('data', function(row) {
+  stream.on('data', function (row) {
     var coin = {
       cTxId: row.ctxid.toString('hex'),
       cIndex: parseInt(row.cindex),
@@ -253,15 +253,16 @@ PostgresStorage.prototype.getCoins = function(address) {
       sHeight: null
     }
 
-    if (row.stxid !== null)
-      coin = _.extend(coin, { sTxId: row.stxid.toString('hex'), sHeight: row.sheight })
+    if (row.stxid !== null) {
+      coin = _.extend(coin, {sTxId: row.stxid.toString('hex'), sHeight: row.sheight})
+    }
 
     coins.push(coin)
   })
 
   var deferred = Q.defer()
-  stream.on('error', function(error) { deferred.reject(error) })
-  stream.on('end', function() { deferred.resolve(coins) })
+  stream.on('error', function (error) { deferred.reject(error) })
+  stream.on('end', function () { deferred.resolve(coins) })
   return deferred.promise
 }
 

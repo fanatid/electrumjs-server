@@ -1,44 +1,35 @@
-module.exports = function(grunt) {
+module.exports = function (grunt) {
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
     jshint: {
+      src: ['Gruntfile.js', 'src/**/*.js', 'test/**/*.js'],
+      src: ['src/**/*.js'],
       options: {
-        asi: true,
-        camelcase: false,
-        esnext: true,
-        freeze: true,
-        immed: true,
-        indent: 2,
-        latedef: true,
-        loopfunc: true,
-        maxcomplexity: 10,
-        maxlen: 120,
-        noarg: true,
-        noempty: true,
-        nonbsp: true,
-        node: true,
-        nonew: true,
-        undef: true,
-        unused: true,
-        strict: false,
-        trailing: true
-      },
-      files: ['src']
+        jshintrc: true,
+        reporter: require('jshint-stylish')
+      }
+    },
+    jscs: {
+      src: ['Gruntfile.js', 'src/**/*.js', 'test/**/*.js'],
+      options: {
+        config: '.jscsrc'
+      }
     },
     mochaTest: {
       test: {
         src: ['test/*.js'],
         options: {
           reporter: 'spec',
-          timeout: 10*1000
+          timeout: 10000
         }
       }
     }
   })
 
   grunt.loadNpmTasks('grunt-contrib-jshint')
+  grunt.loadNpmTasks('grunt-jscs')
   grunt.loadNpmTasks('grunt-mocha-test')
 
   grunt.registerTask('test', ['mochaTest'])
-  grunt.registerTask('default', ['jshint', 'test'])
+  grunt.registerTask('default', ['jshint', 'jscs', 'test'])
 }

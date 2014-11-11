@@ -1,3 +1,6 @@
+var NotImplementedError = require('../errors').NotImplementedError
+
+
 /**
  * @class Storage
  */
@@ -7,7 +10,9 @@ function Storage() {}
  * @abstract
  * @return {Q.Promise}
  */
-Storage.prototype.initialize = function() {}
+Storage.prototype.initialize = function () {
+  throw new NotImplementedError('Storage.initialize')
+}
 
 /**
  * @abstract
@@ -15,19 +20,25 @@ Storage.prototype.initialize = function() {}
  * @param {number} [height]
  * @return {Q.Promise}
  */
-Storage.prototype.pushHeader = function() {}
+Storage.prototype.pushHeader = function () {
+  throw new NotImplementedError('Storage.pushHeader')
+}
 
 /**
  * @abstract
  * @return {Q.Promise}
  */
-Storage.prototype.popHeader = function() {}
+Storage.prototype.popHeader = function () {
+  throw new NotImplementedError('Storage.popHeader')
+}
 
 /**
  * @abstract
  * @return {Q.Promise}
  */
-Storage.prototype.getAllHeaders = function() {}
+Storage.prototype.getAllHeaders = function () {
+  throw new NotImplementedError('Storage.getAllHeaders')
+}
 
 /**
  * @abstract
@@ -38,7 +49,9 @@ Storage.prototype.getAllHeaders = function() {}
  * @param {number} cHeight
  * @return {Q.Promise}
  */
-Storage.prototype.addCoin = function() {}
+Storage.prototype.addCoin = function () {
+  throw new NotImplementedError('Storage.addCoin')
+}
 
 /**
  * @abstract
@@ -46,7 +59,9 @@ Storage.prototype.addCoin = function() {}
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-Storage.prototype.removeCoin = function() {}
+Storage.prototype.removeCoin = function () {
+  throw new NotImplementedError('Storage.removeCoin')
+}
 
 /**
  * @abstract
@@ -56,14 +71,18 @@ Storage.prototype.removeCoin = function() {}
  * @param {number} sHeight
  * @return {Q.Promise}
  */
-Storage.prototype.setSpent = function() {}
+Storage.prototype.setSpent = function () {
+  throw new NotImplementedError('Storage.setSpent')
+}
 
 /**
  * @abstract
  * @param {string} cTxId
  * @param {number} cIndex
  */
-Storage.prototype.setUnspent = function() {}
+Storage.prototype.setUnspent = function () {
+  throw new NotImplementedError('Storage.setUnspent')
+}
 
 /**
  * @abstract
@@ -71,14 +90,18 @@ Storage.prototype.setUnspent = function() {}
  * @param {number} cIndex
  * @return {Q.Promise}
  */
-Storage.prototype.getAddresses = function() {}
+Storage.prototype.getAddresses = function () {
+  throw new NotImplementedError('Storage.getAddresses')
+}
 
 /**
  * @abstract
  * @param {string} address
  * @return {Q.Promise}
  */
-Storage.prototype.getCoins = function() {}
+Storage.prototype.getCoins = function () {
+  throw new NotImplementedError('Storage.getCoins')
+}
 
 
 module.exports = Storage

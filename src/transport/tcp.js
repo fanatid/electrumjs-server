@@ -24,18 +24,16 @@ function TCPClient(socket) {
   self.socket = socket
 
   var message = ''
-  self.socket.on('data', function(data) {
-    if (!self.isActive)
-      return
+  self.socket.on('data', function (data) {
+    if (!self.isActive) { return }
 
     message += data.toString()
-    if (message.indexOf('\n') === -1)
-      return
+    if (message.indexOf('\n') === -1) { return }
 
     var items = message.split('\n')
     message = items.pop()
 
-    items.forEach(function(rawRequest) {
+    items.forEach(function (rawRequest) {
       if (rawRequest === 'quit') {
         self.socket.end()
         self.isActive = false
@@ -45,7 +43,7 @@ function TCPClient(socket) {
     })
   })
 
-  self.socket.on('close', function() { self.emit('end') })
+  self.socket.on('close', function () { self.emit('end') })
 }
 
 inherits(TCPClient, Client)
@@ -53,28 +51,25 @@ inherits(TCPClient, Client)
 /**
  * @param {Object} response
  */
-TCPClient.prototype.send = function(response) {
-  if (this.isActive)
-    this.socket.write(JSON.stringify(response) + '\n')
+TCPClient.prototype.send = function (response) {
+  if (this.isActive) { this.socket.write(JSON.stringify(response) + '\n') }
 }
 
 /**
  * @param {string} rawRequest
  * @fires TCPClient#request
  */
-TCPClient.prototype.handleRawRequest = function(rawRequest) {
-  if (!this.isActive)
-    return
+TCPClient.prototype.handleRawRequest = function (rawRequest) {
+  if (!this.isActive) { return }
 
   var request
   try {
     request = JSON.parse(rawRequest)
   } catch (error) {
-    this.send({ error: 'bad JSON' })
+    this.send({error: 'bad JSON'})
   }
 
-  if (!_.isUndefined(request))
-    this.emit('request', request)
+  if (!_.isUndefined(request)) { this.emit('request', request) }
 }
 
 
@@ -93,7 +88,7 @@ function TCPTransport(interface, port, host) {
   this.port = port
   this.host = host
 
-  this.server = net.createServer(function(socket) {
+  this.server = net.createServer(function (socket) {
     this.interface.newClient(new TCPClient(socket))
   }.bind(this))
 }
@@ -103,10 +98,9 @@ inherits(TCPTransport, Transport)
 /**
  * @return {Q.Promise}
  */
-TCPTransport.prototype.initialize = function() {
+TCPTransport.prototype.initialize = function () {
   var self = this
-  if (self._isInialized)
-    return Q()
+  if (self._isInialized) { return Q() }
 
   self._isInialized = true
 
@@ -116,7 +110,7 @@ TCPTransport.prototype.initialize = function() {
   self.server.on('error', deferred.reject)
   self.server.listen(self.port, self.host)
 
-  return deferred.promise.then(function() {
+  return deferred.promise.then(function () {
     logger.info('Created TCP transport for %s interface, listening on %s:%s',
       self.interface.constructor.name, self.host, self.port)
   })

@@ -1,6 +1,8 @@
 var events = require('events')
 var inherits = require('util').inherits
 
+var NotImplementedError = require('../errors').NotImplementedError
+
 
 /**
  * @event IRCClient#addPeer
@@ -24,7 +26,9 @@ inherits(IRCClient, events.EventEmitter)
 /**
  * @return {Q.Promise}
  */
-IRCClient.prototype.initialize = function() {}
+IRCClient.prototype.initialize = function () {
+  throw new NotImplementedError('IRCClient.initialize')
+}
 
 
 module.exports = IRCClient

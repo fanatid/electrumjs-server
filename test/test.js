@@ -18,10 +18,10 @@ var config = require('./config.yml')
 
 /**
  * @param {string} host
- * @param {resolveHost~callback}
+ * @param {resolveHost~callback} cb
  */
 function resolveHost(host, cb) {
-  dns.resolve(host, function(error, addresses) {
+  dns.resolve(host, function (error, addresses) {
     var isResolved = (error === null && addresses.length > 0)
     expect(isResolved).to.be.true
 
@@ -30,46 +30,49 @@ function resolveHost(host, cb) {
 }
 
 
-describe('Electrum interface', function() {
-  var params = { network: config.network }
+describe('Electrum interface', function () {
+  var params = {network: config.network}
 
-  afterEach(function(done) {
-    params.transport.once('close', function(had_error) {
-      expect(had_error).to.be.false
+  afterEach(function (done) {
+    params.transport.once('close', function (hadError) {
+      expect(hadError).to.be.false
       done()
     })
     params.transport.end()
   })
 
-  if (!_.isUndefined(config.electrum.tcp))
-  describe('TCP transport', function() {
-    beforeEach(function(done) {
-      resolveHost(config.electrum.tcp.host, function(address) {
-        params.transport = new tcp.TCPTransport(address, config.electrum.tcp.port)
+  if (!_.isUndefined(config.electrum.tcp)) {
+    describe('TCP transport', function () {
+      beforeEach(function (done) {
+        resolveHost(config.electrum.tcp.host, function (address) {
+          params.transport = new tcp.TCPTransport(address, config.electrum.tcp.port)
+          params.transport.once('ready', done)
+        })
+      })
+
+      runElectrumTests(params)
+    })
+  }
+
+  if (!_.isUndefined(config.electrum.http)) {
+    describe('HTTP transport', function () {
+      beforeEach(function (done) {
+        params.transport = new HTTPTransport(config.electrum.http.host, config.electrum.http.port)
         params.transport.once('ready', done)
       })
+
+      runElectrumTests(params)
     })
+  }
 
-    runElectrumTests(params)
-  })
+  if (!_.isUndefined(config.electrum.ws)) {
+    describe('WebSocket transport', function () {
+      beforeEach(function (done) {
+        params.transport = new WSTransport(config.electrum.ws.host, config.electrum.ws.port)
+        params.transport.once('ready', done)
+      })
 
-  if (!_.isUndefined(config.electrum.http))
-  describe('HTTP transport', function() {
-    beforeEach(function(done) {
-      params.transport = new HTTPTransport(config.electrum.http.host, config.electrum.http.port)
-      params.transport.once('ready', done)
+      runElectrumTests(params)
     })
-
-    runElectrumTests(params)
-  })
-
-  if (!_.isUndefined(config.electrum.ws))
-  describe('WebSocket transport', function() {
-    beforeEach(function(done) {
-      params.transport = new WSTransport(config.electrum.ws.host, config.electrum.ws.port)
-      params.transport.once('ready', done)
-    })
-
-    runElectrumTests(params)
-  })
+  }
 })

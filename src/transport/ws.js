@@ -23,22 +23,20 @@ function WSClient(socket) {
   self.clientId = socket.id
   self.socket = socket
 
-  self.socket.on('message', function(msg) {
-    if (!self.isActive)
-      return
+  self.socket.on('message', function (msg) {
+    if (!self.isActive) { return }
 
     var request
     try {
       request = JSON.parse(msg)
-    } catch(error) {
-      self.send({ error: 'Bad JSON' })
+    } catch (error) {
+      self.send({error: 'Bad JSON'})
     }
 
-    if (!_.isUndefined(request))
-      self.emit('request', request)
+    if (!_.isUndefined(request)) { self.emit('request', request) }
   })
 
-  self.socket.on('disconnect', function() {
+  self.socket.on('disconnect', function () {
     self.isActive = false
     self.emit('end')
   })
@@ -49,9 +47,8 @@ inherits(WSClient, Client)
 /**
  * @param {Object} data
  */
-WSClient.prototype.send = function(data) {
-  if (this.isActive)
-    this.socket.send(JSON.stringify(data))
+WSClient.prototype.send = function (data) {
+  if (this.isActive) { this.socket.send(JSON.stringify(data)) }
 }
 
 
@@ -71,8 +68,8 @@ function WSTransport(interface, port, host) {
   this.host = host
 
   this.http = http.createServer()
-  this.io = socket(this.http, { serveClient: false })
-  this.io.sockets.on('connection', function(socket) {
+  this.io = socket(this.http, {serveClient: false})
+  this.io.sockets.on('connection', function (socket) {
     this.interface.newClient(new WSClient(socket))
   }.bind(this))
 }
@@ -82,10 +79,9 @@ inherits(WSTransport, Transport)
 /**
  * @return {Q.Promise}
  */
-WSTransport.prototype.initialize = function() {
+WSTransport.prototype.initialize = function () {
   var self = this
-  if (self._isInialized)
-    return Q()
+  if (self._isInialized) { return Q() }
 
   self._isInialized = true
 
@@ -95,7 +91,7 @@ WSTransport.prototype.initialize = function() {
   self.http.on('error', deferred.reject)
   self.http.listen(self.port, self.host)
 
-  return deferred.promise.then(function() {
+  return deferred.promise.then(function () {
     logger.info('Created WebSocket transport for %s interface, listening on %s:%s',
       self.interface.constructor.name, self.host, self.port)
   })

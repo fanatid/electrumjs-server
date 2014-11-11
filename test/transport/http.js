@@ -14,21 +14,28 @@ function HTTPTransport(host, port) {
   self.nextRequestId = 0
   self.wasError = false
 
-  request({ method: 'GET', uri: self.uri, json: true }, function(error, response) {
-    if (error) throw error
+  var requestOpts = {
+    method: 'GET',
+    uri: self.uri,
+    json: true
+  }
+
+  request(requestOpts, function (error, response) {
+    if (error) { throw error }
 
     self.sessionId = (response.headers['set-cookie'] || ['='])[0].split('=')[1]
     self.emit('ready')
 
-    self.updateRequest = setInterval(function() {
+    self.updateRequest = setInterval(function () {
       var requestOpts = {
         method: 'GET',
         uri: self.uri,
         json: true,
-        headers: { 'Cookie': 'SESSION=' + self.sessionId }
+        headers: {'Cookie': 'SESSION=' + self.sessionId}
       }
-      request(requestOpts, function(error, response, body) {
-        if (error) throw error
+
+      request(requestOpts, function (error, response, body) {
+        if (error) { throw error }
         self.processBody(body)
       })
     }, 1000)
@@ -37,24 +44,21 @@ function HTTPTransport(host, port) {
 
 util.inherits(HTTPTransport, events.EventEmitter)
 
-HTTPTransport.prototype.processBody = function(body) {
-  if (_.isUndefined(body))
-    return
+HTTPTransport.prototype.processBody = function (body) {
+  if (_.isUndefined(body)) { return }
 
-  if (!_.isArray(body))
-    body = [body]
+  if (!_.isArray(body)) { body = [body] }
 
-  body.forEach(function(response) {
-    this.emit('response', response)
-  }.bind(this))
+  var self = this
+  body.forEach(function (response) { self.emit('response', response) })
 }
 
-HTTPTransport.prototype.end = function() {
+HTTPTransport.prototype.end = function () {
   clearInterval(this.updateRequest)
   this.emit('close', this.wasError)
 }
 
-HTTPTransport.prototype.request = function(method, params, cb) {
+HTTPTransport.prototype.request = function (method, params, cb) {
   var self = this
 
   var requestId = this.nextRequestId++
@@ -62,16 +66,16 @@ HTTPTransport.prototype.request = function(method, params, cb) {
     method: 'POST',
     uri: self.uri,
     json: true,
-    headers: { 'Cookie': 'SESSION=' + self.sessionId },
-    body: JSON.stringify({ id: requestId, method: method, params: params })
+    headers: {'Cookie': 'SESSION=' + self.sessionId},
+    body: JSON.stringify({id: requestId, method: method, params: params})
   }
 
-  request(requestOpts, function(error, response, body) {
-    if (error) throw error
+  request(requestOpts, function (error, response, body) {
+    if (error) { throw error }
     self.processBody(body)
   })
 
-  var responseEvent = function(response) {
+  var responseEvent = function (response) {
     if (response.id === requestId) {
       self.removeListener('response', responseEvent)
       cb(response)

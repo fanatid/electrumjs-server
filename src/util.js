@@ -14,7 +14,7 @@ var logger = require('./logger').logger
  */
 function spendTime(prevTime) {
   var tm = process.hrtime(prevTime)
-  return tm[0]*1000 + tm[1]/1000000
+  return tm[0] * 1000 + tm[1] / 1000000
 }
 
 
@@ -71,7 +71,7 @@ function revHex(s) {
 function getFullBlock(bitcoinClient, blockHash) {
   var st = process.hrtime()
 
-  return Q.ninvoke(bitcoinClient, 'cmd', 'getblock', blockHash).spread(function(block) {
+  return Q.ninvoke(bitcoinClient, 'cmd', 'getblock', blockHash).spread(function (block) {
     if (block.height === 0) {
       block.tx = []
       block.previousblockhash = '0000000000000000000000000000000000000000000000000000000000000000'
@@ -80,23 +80,21 @@ function getFullBlock(bitcoinClient, blockHash) {
 
     var deferred = Q.defer()
 
-    var batch = block.tx.map(function(txId) {
-      return { method: 'getrawtransaction', params: [txId] }
+    var batch = block.tx.map(function (txId) {
+      return {method: 'getrawtransaction', params: [txId]}
     })
 
     block.tx = []
-    bitcoinClient.cmd(batch, function(error, rawTx) {
-      if (error)
-        return deferred.reject(error)
+    bitcoinClient.cmd(batch, function (error, rawTx) {
+      if (error) { return deferred.reject(error) }
 
       block.tx.push(bitcoin.Transaction.fromHex(rawTx))
-      if (block.tx.length === batch.length)
-        return deferred.resolve(block)
+      if (block.tx.length === batch.length) { deferred.resolve(block) }
     })
 
     return deferred.promise
 
-  }).then(function(block) {
+  }).then(function (block) {
     logger.verbose('getFullBlock #%s, %sms', block.height, spendTime(st))
     return block
 
@@ -171,7 +169,7 @@ function getAddressesFromOutputScript(script, network) {
       break
 
     case 'multisig':
-      addresses = script.chunks.slice(1, -2).map(function(pubKey) {
+      addresses = script.chunks.slice(1, -2).map(function (pubKey) {
         return ECPubKey.fromBuffer(pubKey).getAddress(network)
       })
       break
@@ -184,7 +182,7 @@ function getAddressesFromOutputScript(script, network) {
       break
   }
 
-  return addresses.map(function(addr) { return addr.toBase58Check() })
+  return addresses.map(function (addr) { return addr.toBase58Check() })
 }
 
 

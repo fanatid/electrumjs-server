@@ -26,16 +26,15 @@ inherits(HTTPClient, Client)
 /**
  * @param {Object} response
  */
-HTTPClient.prototype.send = function(response) {
+HTTPClient.prototype.send = function (response) {
   this.responses.push(JSON.stringify(response))
 }
 
 /**
  * @param {Object} request
  */
-HTTPClient.prototype.request = function(request) {
-  if (!this.isActive)
-    return
+HTTPClient.prototype.request = function (request) {
+  if (!this.isActive) { return }
 
   this.restartDestroyTimeout()
   this.emit('request', request)
@@ -44,7 +43,7 @@ HTTPClient.prototype.request = function(request) {
 /**
  * @return {*[]}
  */
-HTTPClient.prototype.getResponses = function() {
+HTTPClient.prototype.getResponses = function () {
   var result = this.responses
   this.responses = []
   return result
@@ -52,16 +51,17 @@ HTTPClient.prototype.getResponses = function() {
 
 /**
  */
-HTTPClient.prototype.restartDestroyTimeout = function() {
-  if (!_.isUndefined(this.destroyTimeout))
+HTTPClient.prototype.restartDestroyTimeout = function () {
+  if (!_.isUndefined(this.destroyTimeout)) {
     clearTimeout(this.destroyTimeout)
+  }
 
-  this.destroyTimeout = setTimeout(this.destroy.bind(this), 60*1000)
+  this.destroyTimeout = setTimeout(this.destroy.bind(this), 60000)
 }
 
 /**
  */
-HTTPClient.prototype.destroy = function() {
+HTTPClient.prototype.destroy = function () {
   this.isActive = false
   this.emit('end')
 }
@@ -83,14 +83,13 @@ function HTTPTransport(interface, port, host) {
   this.host = host
 
   var clients = {}
-  setInterval(function() {
-    Object.keys(clients).forEach(function(sessionId) {
-      if (!clients[sessionId].isActive)
-        delete clients[sessionId]
+  setInterval(function () {
+    Object.keys(clients).forEach(function (sessionId) {
+      if (!clients[sessionId].isActive) { delete clients[sessionId] }
     })
   }, 6000)
 
-  this.http = http.createServer(function(request, response) {
+  this.http = http.createServer(function (request, response) {
     function process(data) {
       var sessionId = (request.headers.cookie || '').split('=')[1]
       if (_.isUndefined(sessionId)) {
@@ -101,7 +100,7 @@ function HTTPTransport(interface, port, host) {
       }
 
       if (_.isUndefined(clients[sessionId])) {
-        response.writeHead(418, { 'Content-Length': 17, 'Content-Type': 'text/plain' })
+        response.writeHead(418, {'Content-Length': 17, 'Content-Type': 'text/plain'})
         response.end('Session not found')
         return
       }
@@ -109,26 +108,23 @@ function HTTPTransport(interface, port, host) {
       var reqEntries
       try {
         reqEntries = JSON.parse(data)
-        if (!_.isArray(reqEntries))
-          reqEntries = [reqEntries]
+        if (!_.isArray(reqEntries)) { reqEntries = [reqEntries] }
 
-      } catch(error) {
-        response.writeHead(400, { 'Content-Length': 8, 'Content-Type': 'text/plain' })
+      } catch (error) {
+        response.writeHead(400, {'Content-Length': 8, 'Content-Type': 'text/plain'})
         response.end('Bad JSON')
         return
 
       }
 
-      reqEntries.forEach(function(reqEntry) {
+      reqEntries.forEach(function (reqEntry) {
         clients[sessionId].request(reqEntry)
       })
 
       var body = ''
       var responses = clients[sessionId].getResponses()
-      if (responses.length === 1)
-        body = responses[0]
-      if (responses.length > 1)
-        body = '[' + responses.join(',') + ']'
+      if (responses.length === 1) { body = responses[0] }
+      if (responses.length > 1) { body = '[' + responses.join(',') + ']' }
 
       response.writeHead(200, {
         'Content-Length': body.length,
@@ -137,20 +133,17 @@ function HTTPTransport(interface, port, host) {
       })
       response.end(body)
     }
-    
+
     if (request.method === 'POST') {
       var body = ''
 
-      request.on('data', function(data) {
+      request.on('data', function (data) {
         body += data
 
-        if (body.length > 1048576)
-          request.connection.destroy()
+        if (body.length > 1048576) { request.connection.destroy() }
       })
 
-      request.on('end', function() {
-        process(body)
-      })
+      request.on('end', function () { process(body) })
 
     } else if (request.method === 'GET') {
       process('[]')
@@ -164,10 +157,9 @@ inherits(HTTPTransport, Transport)
 /**
  * @return {Q.Promise}
  */
-HTTPTransport.prototype.initialize = function() {
+HTTPTransport.prototype.initialize = function () {
   var self = this
-  if (self._isInialized)
-    return Q()
+  if (self._isInialized) { return Q() }
 
   self._isInialized = true
 
@@ -177,7 +169,7 @@ HTTPTransport.prototype.initialize = function() {
   self.http.on('error', deferred.reject)
   self.http.listen(self.port, self.host)
 
-  return deferred.promise.then(function() {
+  return deferred.promise.then(function () {
     logger.info('Created HTTP transport for %s interface, listening on %s:%s',
       self.interface.constructor.name, self.host, self.port)
   })

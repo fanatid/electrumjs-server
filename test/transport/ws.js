@@ -11,25 +11,21 @@ function WSTransport(host, port) {
   self.nextRequestId = 0
 
   var wsURL = ['http://', host, ':', port].join('')
-  self.socket = socket(wsURL, { forceNew: true })
-  self.socket.on('connect', function() {
-    self.emit('ready')
-  })
-  self.socket.on('error', function(error) {
-    self.emit('close', true)
-  })
-  self.socket.on('message', function(msg) {
+  self.socket = socket(wsURL, {forceNew: true})
+  self.socket.on('connect', function () { self.emit('ready') })
+  self.socket.on('error', function () { self.emit('close', true) })
+  self.socket.on('message', function (msg) {
     self.emit('response', JSON.parse(msg))
   })
 }
 
 util.inherits(WSTransport, events.EventEmitter)
 
-WSTransport.prototype.end = function() {
+WSTransport.prototype.end = function () {
   this.emit('close', false)
 }
 
-WSTransport.prototype.request = function(method, params, cb) {
+WSTransport.prototype.request = function (method, params, cb) {
   var requestId = this.nextRequestId++
   var data = {
     'id': requestId,
@@ -38,7 +34,7 @@ WSTransport.prototype.request = function(method, params, cb) {
   }
   this.socket.send(JSON.stringify(data))
 
-  var responseEvent = function(response) {
+  var responseEvent = function (response) {
     if (response.id === requestId) {
       this.removeListener('response', responseEvent)
       cb(response)

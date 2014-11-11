@@ -23,11 +23,13 @@ if (argv.help) {
 }
 
 /** config localtion */
-if (_.isUndefined(process.env.NODE_CONFIG_DIR))
+if (_.isUndefined(process.env.NODE_CONFIG_DIR)) {
   process.env.NODE_CONFIG_DIR = path.dirname(path.resolve(argv.config))
+}
 /** config filename */
-if (_.isUndefined(process.env.NODE_ENV))
+if (_.isUndefined(process.env.NODE_ENV)) {
   process.env.NODE_ENV = argv.config.slice(0, argv.config.length - path.extname(argv.config).length)
+}
 
 var config = require('config')
 
@@ -40,15 +42,14 @@ var Blockchain = require('./blockchain')
 var Electrum = require('./interface/electrum')
 
 
-Q.spawn(function* () {
+Q.spawn(function* runServer() {
   try {
-    if (!_.isUndefined(global.gc))
-      setInterval(global.gc, 10*1000)
+    if (!_.isUndefined(global.gc)) { setInterval(global.gc, 10 * 1000) }
 
     var blockchain = new Blockchain()
     yield blockchain.initialize()
 
-    var promises = config.get('server.interface').map(function(configInterface) {
+    var promises = config.get('server.interface').map(function (configInterface) {
       switch (configInterface) {
         case 'electrum':
           return new Electrum(blockchain).initialize()
@@ -58,8 +59,7 @@ Q.spawn(function* () {
       }
     })
 
-    if (promises.length === 0)
-      throw new Error('Interfaces not found')
+    if (promises.length === 0) { throw new Error('Interfaces not found') }
 
     yield Q.all(promises)
     logger.info('Server ready')

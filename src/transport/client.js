@@ -2,6 +2,8 @@ var crypto = require('crypto')
 var events = require('events')
 var util = require('util')
 
+var NotImplementedError = require('../errors').NotImplementedError
+
 
 /**
  * @event Client#request
@@ -26,7 +28,7 @@ util.inherits(Client, events.EventEmitter)
 /**
  * @return {string}
  */
-Client.prototype.getId = function() {
+Client.prototype.getId = function () {
   return this.clientId
 }
 
@@ -34,7 +36,9 @@ Client.prototype.getId = function() {
  * @abstract
  * @param {Object} response
  */
-Client.prototype.send = function() { throw new Error('Not implemented yet') }
+Client.prototype.send = function () {
+  throw new NotImplementedError('Client.send')
+}
 
 
 module.exports = Client

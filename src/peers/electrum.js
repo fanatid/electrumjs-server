@@ -10,21 +10,27 @@ var IRCClient = require('./ircclient')
 var electrumVersion = require('../version').interface.electrum
 var logger = require('../logger').logger
 
-var namesMap = { http: 'h', https: 'g', tcp: 't', ssl: 's', ws: 'w', wss: 'v' }
-var portsMap = { h: 8081, g: 8082, t: 50001, s: 50002, w: 8783, v: 8886 }
+var namesMap = {http: 'h', https: 'g', tcp: 't', ssl: 's', ws: 'w', wss: 'v'}
+var portsMap = {h: 8081, g: 8082, t: 50001, s: 50002, w: 8783, v: 8886}
 
 
+/**
+ * @return {string}
+ */
 function getRealName() {
   var realName = config.get('electrum.irc.reportHost') + ' v' + electrumVersion + ' '
 
-  config.get('electrum.transport').forEach(function(transport) {
+  config.get('electrum.transport').forEach(function (transport) {
     var letter = namesMap[transport.type]
 
     if (!_.isUndefined(letter)) {
-      if (portsMap[letter] === transport.port)
+      if (portsMap[letter] === transport.port) {
         realName += letter + ' '
-      else
+
+      } else {
         realName += letter + transport.port + ' '
+
+      }
     }
   })
 
@@ -69,15 +75,16 @@ function ElectrumIRCClient() {
       this.nickPrefix = 'EL_'
       break
 
-    case 'litecoin_testnet':
+    case 'litecoinTestnet':
       this.nickPrefix = 'ELT_'
       break
   }
 
   var nickName = this.nickPrefix + config.get('electrum.irc.nick')
   var channel = '#electrum'
-  if (this.nickPrefix === 'EL_' || this.nickPrefix === 'ELT_')
+  if (this.nickPrefix === 'EL_' || this.nickPrefix === 'ELT_') {
     channel = '#electrum-ltc'
+  }
 
   this.client = new irc.Client('irc.freenode.net', nickName, {
     realName: getRealName(),
@@ -92,10 +99,9 @@ inherits(ElectrumIRCClient, IRCClient)
 /**
  * @return {Q.Promise}
  */
-ElectrumIRCClient.prototype.initialize = function() {
+ElectrumIRCClient.prototype.initialize = function () {
   var self = this
-  if (self._isInialized)
-    return Q()
+  if (self._isInialized) { return Q() }
 
   self._isInialized = true
 
@@ -103,40 +109,36 @@ ElectrumIRCClient.prototype.initialize = function() {
 
   self.client.connect()
 
-  self.client.on('registered', function() {
+  self.client.on('registered', function () {
     logger.info('Electrum IRC connected')
     deferred.resolve()
   })
 
-  self.client.on('names#electrum', function(nicks) {
-    Object.keys(nicks).forEach(function(nick) {
-      if (nick.indexOf(self.nickPrefix) === 0)
-        self.client.send('WHO', nick)
+  self.client.on('names#electrum', function (nicks) {
+    Object.keys(nicks).forEach(function (nick) {
+      if (nick.indexOf(self.nickPrefix) === 0) { self.client.send('WHO', nick) }
     })
   })
 
-  self.client.on('join#electrum', function(nick) {
-    if (nick.indexOf(self.nickPrefix) === 0)
-      self.client.send('WHO', nick)
+  self.client.on('join#electrum', function (nick) {
+    if (nick.indexOf(self.nickPrefix) === 0) { self.client.send('WHO', nick) }
   })
 
-  self.client.on('quit', function(nick) {
-    self.emit('removePeer', { nick: nick })
+  self.client.on('quit', function (nick) {
+    self.emit('removePeer', {nick: nick})
   })
 
-  self.client.on('kick#electrum', function(nick) {
-    self.emit('removePeer', { nick: nick })
+  self.client.on('kick#electrum', function (nick) {
+    self.emit('removePeer', {nick: nick})
   })
 
-  self.client.on('raw', function(message) {
-    if (message.command !== 'rpl_whoreply')
-      return
+  self.client.on('raw', function (message) {
+    if (message.command !== 'rpl_whoreply') { return }
 
     var items = (message.args[7] || '').split(' ')
-    dns.resolve(items[1], function(error, addresses) {
+    dns.resolve(items[1], function (error, addresses) {
       if (error || addresses.length === 0) {
-        logger.warn('dns.resolve address: %s | %s', addresses.toString(), error.stack)
-        return
+        return logger.warn('dns.resolve address: %s | %s', addresses.toString(), error.stack)
       }
 
       self.emit('addPeer', {
@@ -148,7 +150,7 @@ ElectrumIRCClient.prototype.initialize = function() {
     })
   })
 
-  self.client.on('error', function(error) {
+  self.client.on('error', function (error) {
     logger.error('ElectrumIRC error: %s', error.stack)
     deferred.reject(error)
   })
