@@ -301,13 +301,17 @@ Electrum.prototype.getAddressStatus = function (address) {
  */
 Electrum.prototype.getHistory = function (address) {
   return this.blockchain.getCoins(address).then(function (coins) {
-    var history = []
-    coins.forEach(function (coin) {
-      history.push([coin.cTxId, coin.cHeight])
-      if (coin.sTxId !== null) { history.push([coin.sTxId, coin.sHeight]) }
-    })
-    history = _.sortBy(_.uniq(history), function (entry) { return entry[1] === 0 ? Infinity : entry[1] })
-    return history.map(function (entry) { return {tx_hash: entry[0], height: entry[1]} })
+    return _.chain(coins)
+      .map(function (coin) {
+        var result = [[coin.cTxId, coin.cHeight]]
+        if (coin.sTxId !== null) { result.push([coin.sTxId, coin.sHeight]) }
+        return result
+      })
+      .flatten(true)
+      .uniq(function (o) { return o[0] + o[1] })
+      .sortBy(function (o) { return o[1] === 0 ? Infinity : o[1] })
+      .map(function (o) { return {tx_hash: o[0], height: o[1]} })
+      .value()
   })
 }
 

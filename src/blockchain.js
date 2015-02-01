@@ -15,11 +15,12 @@ var util = require('./util')
 
 /**
  * @event Blockchain#newHeight
+ * @param {number} height
  */
 
 /**
  * @event Blockchain#touchedAddress
- * @type {string}
+ * @param {string} address
  */
 
 /**
