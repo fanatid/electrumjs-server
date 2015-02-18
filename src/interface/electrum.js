@@ -197,7 +197,7 @@ Electrum.prototype.newRequest = function (client, request) {
 
           var addresses = self.subscribers.clientAddresses[client.getId()]
           if (_.isUndefined(addresses)) { addresses = [] }
-          addresses.push(params[0])
+          if (addresses.indexOf(params[0]) === -1) { addresses.push(params[0]) }
           self.subscribers.clientAddresses[client.getId()] = addresses
 
           break
