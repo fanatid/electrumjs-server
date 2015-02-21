@@ -437,13 +437,33 @@ Blockchain.prototype.updateMempool = function () {
     tAddresses: new util.Set()
   }
 
-  /**
-   * @param {string} txId
-   * @return {Q.Promise}
-   */
-  function addTx(txId) {
-    return self.bitcoind('getrawtransaction', txId).spread(function (rawTx) {
-      var tx = bitcoin.Transaction.fromHex(rawTx)
+  return self.bitcoind('getrawmempool').spread(function (mempoolTxIds) {
+    var batch = _.chain(mempoolTxIds)
+      .filter(function (txId) { return _.isUndefined(self.mempool.txIds[txId]) })
+      .map(function (txId) { return {method: 'getrawtransaction', params: [txId]} })
+      .value()
+
+    var deferred = Q.defer()
+    var txs = []
+
+    self.bitcoindClient.cmd(batch, function (error, rawTx) {
+      if (error) { return deferred.reject(error) }
+
+      try {
+        txs.push(bitcoin.Transaction.fromHex(rawTx))
+        if (txs.length === batch.length) { deferred.resolve(txs) }
+
+      } catch (error) {
+        deferred.reject(error)
+
+      }
+    })
+
+    return deferred.promise
+
+  }).then(function (txs) {
+    var promises = txs.map(function (tx) {
+      var txId = tx.getId()
 
       self.mempool.txIds[txId] = true
       stat.added += 1
@@ -471,13 +491,6 @@ Blockchain.prototype.updateMempool = function () {
         })
       })
     })
-  }
-
-  return self.bitcoind('getrawmempool').spread(function (mempoolTxIds) {
-    var promises = _.chain(mempoolTxIds)
-      .filter(function (txId) { return _.isUndefined(self.mempool.txIds[txId]) })
-      .map(addTx)
-      .value()
 
     return Q.all(promises)
 

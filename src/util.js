@@ -88,8 +88,14 @@ function getFullBlock(bitcoinClient, blockHash) {
     bitcoinClient.cmd(batch, function (error, rawTx) {
       if (error) { return deferred.reject(error) }
 
-      block.tx.push(bitcoin.Transaction.fromHex(rawTx))
-      if (block.tx.length === batch.length) { deferred.resolve(block) }
+      try {
+        block.tx.push(bitcoin.Transaction.fromHex(rawTx))
+        if (block.tx.length === batch.length) { deferred.resolve(block) }
+
+      } catch (error) {
+        deferred.reject(error)
+
+      }
     })
 
     return deferred.promise
