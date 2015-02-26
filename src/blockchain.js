@@ -443,6 +443,10 @@ Blockchain.prototype.updateMempool = function () {
       .map(function (txId) { return {method: 'getrawtransaction', params: [txId]} })
       .value()
 
+    if (batch.length === 0) {
+      return Q.resolve([])
+    }
+
     var deferred = Q.defer()
     var txs = []
 
@@ -462,7 +466,7 @@ Blockchain.prototype.updateMempool = function () {
     return deferred.promise
 
   }).then(function (txs) {
-    var promises = txs.map(function (tx) {
+    txs.forEach(function (tx) {
       var txId = tx.getId()
 
       self.mempool.txIds[txId] = true
@@ -491,8 +495,6 @@ Blockchain.prototype.updateMempool = function () {
         })
       })
     })
-
-    return Q.all(promises)
 
   }).then(function () {
     var addAddressToStat = stat.tAddresses.add.bind(stat.tAddresses)
