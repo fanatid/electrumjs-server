@@ -7,6 +7,7 @@ var bitcoin = require('bitcoinjs-lib')
 var bufferEqual = require('buffer-equal')
 var _ = require('lodash')
 var Q = require('q')
+var LRU = require('lru-cache')
 
 var logger = require('./logger').logger
 var networks = require('./networks')
@@ -30,6 +31,11 @@ function Blockchain() {
   events.EventEmitter.call(this)
 
   this._isInialized = false
+
+  // accelerate update mempool
+  this._addressCache = LRU({
+    max: 5000
+  })
 }
 
 inherits(Blockchain, events.EventEmitter)
@@ -508,7 +514,13 @@ Blockchain.prototype.updateMempool = function () {
         return self.mempool.addrs[addr].forEach(addAddressToStat)
       }
 
+      var addrs = self._addressCache.get(items[0] + ':' + items[1])
+      if (typeof addrs !== 'undefined') {
+        return addrs.forEach(addAddressToStat)
+      }
+
       return self.storage.getAddresses(items[0], parseInt(items[1], 10)).then(function (addrs) {
+        self._addressCache.set(items[0] + ':' + items[1], addrs)
         addrs.forEach(addAddressToStat)
       })
     })
