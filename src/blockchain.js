@@ -542,19 +542,19 @@ Blockchain.prototype.mainIteration = function () {
   var self = this
 
   Q.spawn(function* iteration() {
-    try {
-      var startTime = Date.now()
+    var startTime = Date.now()
 
+    try {
       yield self.catchUp()
       yield self.updateMempool()
-
-      var sleepTime = Math.max(0, 5000 - (Date.now() - startTime))
-      setTimeout(self.mainIteration.bind(self), sleepTime)
 
     } catch (error) {
       logger.error('Blockchain.mainIteration error: %s', error.stack)
 
     }
+
+    var sleepTime = Math.max(0, 5000 - (Date.now() - startTime))
+    setTimeout(self.mainIteration.bind(self), sleepTime)
   })
 }
 
