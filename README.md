@@ -1,6 +1,14 @@
 Electrum-server for the Electrum client
 =======================================
 
+\--------------------------------------------------------------------------------
+
+**NOT SUPPORTED ANYMORE**
+
+please see [chromanode](http://github.com/chromaway/chromanode/), next version of electrumjs-server
+
+\--------------------------------------------------------------------------------
+
 [![Build Status](https://travis-ci.org/fanatid/electrumjs-server.svg?branch=master)](https://travis-ci.org/fanatid/electrumjs-server) [![Dependency status](https://david-dm.org/fanatid/electrumjs-server/status.png)](https://david-dm.org/fanatid/electrumjs-server#info=dependencies&view=table) [![Dev Dependency Status](https://david-dm.org/fanatid/electrumjs-server/dev-status.png)](https://david-dm.org/fanatid/electrumjs-server#info=devDependencies&view=table)
 
 Features
